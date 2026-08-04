@@ -29,12 +29,18 @@ public class CyberpunkSaverView: ScreenSaverView {
     private let colorTextMain = NSColor(red: 0.88, green: 0.97, blue: 1.0, alpha: 1.0)
     private let colorTextDim = NSColor(red: 0.88, green: 0.97, blue: 1.0, alpha: 0.6)
 
-    // MARK: - Pre-Cached Fonts
+    // MARK: - Pre-Cached Fonts & Paragraph Styles
     private let fontClock = NSFont(name: "Menlo-Bold", size: 24) ?? NSFont.boldSystemFont(ofSize: 24)
     private let fontDate = NSFont(name: "Menlo-Bold", size: 12) ?? NSFont.boldSystemFont(ofSize: 12)
     private let fontTagBold = NSFont(name: "Menlo-Bold", size: 13) ?? NSFont.boldSystemFont(ofSize: 13)
     private let fontTagRegular = NSFont(name: "Menlo", size: 12) ?? NSFont.systemFont(ofSize: 12)
     private let fontSmall = NSFont(name: "Menlo", size: 11) ?? NSFont.systemFont(ofSize: 11)
+
+    private let truncateStyle: NSParagraphStyle = {
+        let p = NSMutableParagraphStyle()
+        p.lineBreakMode = .byTruncatingTail
+        return p
+    }()
 
     // MARK: - 100% REAL Live Host Telemetry State
     private var cpuLoad: Int = 0
@@ -53,13 +59,13 @@ public class CyberpunkSaverView: ScreenSaverView {
     private var secondaryLogLine: String = "SHIVA DECRYPTION NODES SYNCED"
     private let logTemplates = [
         "KUANG-DENG 0.9 // INITIATING NEURAL MATRIX LINK...",
-        "BYPASSING CHIBA CITY BACKBONE FIREWALL [GATE 0x8F4A]",
+        "BYPASSING CHIBA CITY FIREWALL [GATE 0x8F4A]",
         "ICE DETECTED: BLACK ICE DEFENSE PROTOCOL ACTIVE",
-        "DEPLOYING SHIVA DISSOLUTION NODES (0x99F...0x41C)",
-        "DECRYPTING SATELLITE TELEMETRY PACKETS... 100% MATCH",
-        "CYBER-DEFENSE PULSE NEUTRALIZED. RETAINING ZERO-TRACE.",
-        "HOST MEMORY ALLOCATION: 0x00FF8800 [BUFFER STABLE]",
-        "OPEN-METEO TELEMETRY SYNCED // PHOENIX NODES RESPONDING",
+        "DEPLOYING SHIVA DISSOLUTION NODES (0x99F...)",
+        "DECRYPTING SATELLITE PACKETS... 100% MATCH",
+        "CYBER-DEFENSE PULSE NEUTRALIZED. ZERO-TRACE.",
+        "HOST MEMORY ALLOCATION: 0x00FF8800 [STABLE]",
+        "OPEN-METEO TELEMETRY SYNCED // PHOENIX NODES",
         "PROMOTION DISPLAY SYNCED // LATENCY 0.8ms"
     ]
 
@@ -121,7 +127,6 @@ public class CyberpunkSaverView: ScreenSaverView {
         guard let ctx = NSGraphicsContext.current?.cgContext else { return }
         let bounds = self.bounds
 
-        // High-quality image interpolation for 100% sharp 4K image rendering
         ctx.interpolationQuality = .high
 
         // 1. Draw Razor-Sharp Background Image
@@ -201,21 +206,29 @@ public class CyberpunkSaverView: ScreenSaverView {
         ctx.restoreGState()
     }
 
+    // BOTTOM LEFT: 2-Line Mini Terminal Badge with Dynamic Width & Tail Truncation
     private func drawBottomLeftTerminalBadge(in ctx: CGContext, bounds: CGRect) {
         ctx.saveGState()
-        let badgeRect = CGRect(x: 32, y: 32, width: 500, height: 60)
+        let badgeW: CGFloat = min(560, bounds.width * 0.44)
+        let badgeRect = CGRect(x: 32, y: 32, width: badgeW, height: 64)
         drawGlassPanel(in: ctx, rect: badgeRect, borderColor: colorBorderCyan)
 
         let line1 = "> \(currentLogLine)"
         let line2 = "  \(secondaryLogLine)"
 
-        (line1 as NSString).draw(at: CGPoint(x: 48, y: 64), withAttributes: [
+        let textW = badgeW - 32
+        let line1Rect = CGRect(x: 48, y: 62, width: textW, height: 20)
+        let line2Rect = CGRect(x: 48, y: 42, width: textW, height: 18)
+
+        (line1 as NSString).draw(in: line1Rect, withAttributes: [
             .font: fontTagRegular,
-            .foregroundColor: colorNeonGreen
+            .foregroundColor: colorNeonGreen,
+            .paragraphStyle: truncateStyle
         ])
-        (line2 as NSString).draw(at: CGPoint(x: 48, y: 44), withAttributes: [
+        (line2 as NSString).draw(in: line2Rect, withAttributes: [
             .font: fontSmall,
-            .foregroundColor: colorTextDim
+            .foregroundColor: colorTextDim,
+            .paragraphStyle: truncateStyle
         ])
         ctx.restoreGState()
     }
@@ -223,7 +236,7 @@ public class CyberpunkSaverView: ScreenSaverView {
     private func drawBottomRightMetricsBadge(in ctx: CGContext, bounds: CGRect) {
         ctx.saveGState()
         let badgeW: CGFloat = 450
-        let badgeRect = CGRect(x: bounds.width - badgeW - 32, y: 32, width: badgeW, height: 60)
+        let badgeRect = CGRect(x: bounds.width - badgeW - 32, y: 32, width: badgeW, height: 64)
         drawGlassPanel(in: ctx, rect: badgeRect, borderColor: colorBorderCyan)
 
         let cpuBar = makeProgressBar(percent: cpuLoad)
