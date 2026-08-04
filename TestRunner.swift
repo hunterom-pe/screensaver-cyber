@@ -1,6 +1,5 @@
 import AppKit
 import ScreenSaver
-import WebKit
 
 @main
 class TestRunnerApp: NSObject, NSApplicationDelegate {
@@ -15,13 +14,14 @@ class TestRunnerApp: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        let screenRect = NSScreen.main?.frame ?? NSRect(x: 0, y: 0, width: 1280, height: 720)
         window = NSWindow(
             contentRect: NSRect(x: 100, y: 100, width: 1280, height: 720),
             styleMask: [.titled, .closable, .resizable, .miniaturizable],
             backing: .buffered,
             defer: false
         )
-        window.title = "CyberpunkSaver Live Host Diagnostic"
+        window.title = "CyberpunkSaver 100% Native Swift Live Diagnostic"
         window.center()
         
         saverView = CyberpunkSaverView(frame: window.contentView!.bounds, isPreview: false)
@@ -34,6 +34,6 @@ class TestRunnerApp: NSObject, NSApplicationDelegate {
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         
-        print("✅ CyberpunkSaver Host Window Started successfully!")
+        print("✅ CyberpunkSaver Native Host Window Started successfully!")
     }
 }
