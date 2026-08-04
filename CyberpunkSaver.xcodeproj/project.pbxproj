@@ -1,0 +1,238 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		1A0000012C60000100000001 /* CyberpunkSaverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000022C60000100000001 /* CyberpunkSaverView.swift */; };
+		1A0000032C60000100000001 /* WebContent in Resources */ = {isa = PBXBuildFile; fileRef = 1A0000042C60000100000001 /* WebContent */; };
+		1A0000052C60000100000001 /* ScreenSaver.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1A0000062C60000100000001 /* ScreenSaver.framework */; };
+		1A0000072C60000100000001 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1A0000082C60000100000001 /* WebKit.framework */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		1A0000092C60000100000001 /* CyberpunkSaver.saver */ = {isa = PBXFileReference; explicitFileType = "wrapper.cfbundle"; includeInIndex = 0; path = CyberpunkSaver.saver; sourceTree = BUILT_PRODUCTS_DIR; };
+		1A0000022C60000100000001 /* CyberpunkSaverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CyberpunkSaverView.swift; sourceTree = "<group>"; };
+		1A0000042C60000100000001 /* WebContent */ = {isa = PBXFileReference; lastKnownFileType = folder; path = WebContent; sourceTree = "<group>"; };
+		1A00000A2C60000100000001 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		1A0000062C60000100000001 /* ScreenSaver.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ScreenSaver.framework; path = System/Library/Frameworks/ScreenSaver.framework; sourceTree = SDKROOT; };
+		1A0000082C60000100000001 /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		1A00000B2C60000100000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1A0000052C60000100000001 /* ScreenSaver.framework in Frameworks */,
+				1A0000072C60000100000001 /* WebKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		1A00000C2C60000100000001 = {
+			isa = PBXGroup;
+			children = (
+				1A00000D2C60000100000001 /* CyberpunkSaver */,
+				1A00000E2C60000100000001 /* Frameworks */,
+				1A00000F2C60000100000001 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		1A00000D2C60000100000001 /* CyberpunkSaver */ = {
+			isa = PBXGroup;
+			children = (
+				1A0000022C60000100000001 /* CyberpunkSaverView.swift */,
+				1A0000042C60000100000001 /* WebContent */,
+				1A00000A2C60000100000001 /* Info.plist */,
+			);
+			path = CyberpunkSaver;
+			sourceTree = "<group>";
+		};
+		1A00000E2C60000100000001 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				1A0000062C60000100000001 /* ScreenSaver.framework */,
+				1A0000082C60000100000001 /* WebKit.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		1A00000F2C60000100000001 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				1A0000092C60000100000001 /* CyberpunkSaver.saver */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		1A0000102C60000100000001 /* CyberpunkSaver */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1A0000112C60000100000001 /* Build configuration list for PBXNativeTarget "CyberpunkSaver" */;
+			buildPhases = (
+				1A0000122C60000100000001 /* Sources */,
+				1A00000B2C60000100000001 /* Frameworks */,
+				1A0000132C60000100000001 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = CyberpunkSaver;
+			productName = CyberpunkSaver;
+			productReference = 1A0000092C60000100000001 /* CyberpunkSaver.saver */;
+			productType = "com.apple.product-type.bundle";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		1A0000142C60000100000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+					1A0000102C60000100000001 = {
+						CreatedOnToolsVersion = 15.0;
+					};
+				};
+			};
+			buildConfigurationList = 1A0000152C60000100000001 /* Build configuration list for PBXProject "CyberpunkSaver" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 1A00000C2C60000100000001;
+			productRefGroup = 1A00000F2C60000100000001 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				1A0000102C60000100000001 /* CyberpunkSaver */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		1A0000132C60000100000001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1A0000032C60000100000001 /* WebContent in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		1A0000122C60000100000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1A0000012C60000100000001 /* CyberpunkSaverView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		1A0000162C60000100000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CODE_SIGN_IDENTITY = "-";
+				COMBINE_HIDPI_IMAGES = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				INFOPLIST_FILE = CyberpunkSaver/Info.plist;
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.cyberpunk.saver.CyberpunkSaver;
+				PRODUCT_NAME = CyberpunkSaver;
+				WRAPPER_EXTENSION = saver;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		1A0000172C60000100000001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CODE_SIGN_IDENTITY = "-";
+				COMBINE_HIDPI_IMAGES = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				INFOPLIST_FILE = CyberpunkSaver/Info.plist;
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				MTL_FAST_MATH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.cyberpunk.saver.CyberpunkSaver;
+				PRODUCT_NAME = CyberpunkSaver;
+				WRAPPER_EXTENSION = saver;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		1A0000112C60000100000001 /* Build configuration list for PBXNativeTarget "CyberpunkSaver" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1A0000162C60000100000001 /* Debug */,
+				1A0000172C60000100000001 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		1A0000152C60000100000001 /* Build configuration list for PBXProject "CyberpunkSaver" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1A0000162C60000100000001 /* Debug */,
+				1A0000172C60000100000001 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 1A0000142C60000100000001 /* Project object */;
+}

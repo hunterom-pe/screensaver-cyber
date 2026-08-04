@@ -1,0 +1,7 @@
+# Xcode & Build Artifacts
+build/
+DerivedData/
+module-cache/
+*.xcodeproj/project.xcworkspace
+*.xcodeproj/xcuserdata/
+.DS_Store
