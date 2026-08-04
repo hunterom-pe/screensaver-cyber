@@ -2,7 +2,7 @@
 //  CyberpunkSaverView.swift
 //  CyberpunkSaver
 //
-//  Native macOS ScreenSaverView subclass with zero-allocation 120 FPS render loop
+//  Native macOS ScreenSaverView subclass with unified single-canvas drawing pipeline
 //
 
 import ScreenSaver
@@ -14,7 +14,7 @@ import Foundation
 @objc(CyberpunkSaverView)
 public class CyberpunkSaverView: ScreenSaverView {
 
-    // MARK: - Pre-Cached Colors (Zero Allocations in Draw Loop)
+    // MARK: - Pre-Cached Colors
     private let colorBgDark = NSColor(red: 0.02, green: 0.03, blue: 0.05, alpha: 1.0)
     private let colorPanelBg = NSColor(red: 0.03, green: 0.06, blue: 0.09, alpha: 0.78)
     private let colorBorderCyan = NSColor(red: 0.0, green: 0.9, blue: 1.0, alpha: 0.6)
@@ -60,7 +60,6 @@ public class CyberpunkSaverView: ScreenSaverView {
     private var weatherAqiStr: String = "38 (GOOD)"
     private var weatherHumidityStr: String = "42%"
     private var weatherWindStr: String = "12 KM/H"
-    private var isOffline: Bool = false
 
     private var radarAngle: CGFloat = 0.0
     private var terminalLogs: [String] = []
@@ -76,8 +75,8 @@ public class CyberpunkSaverView: ScreenSaverView {
         "PROMOTION 120Hz V-SYNC SYNCED // LATENCY 0.8ms"
     ]
 
-    // MARK: - Subviews & Timers
-    private var bgImageView: NSImageView?
+    // MARK: - Assets & Timers
+    private var bgImage: NSImage?
     private var telemetryTimer: Timer?
     private var weatherTimer: Timer?
     private var terminalTimer: Timer?
@@ -99,35 +98,21 @@ public class CyberpunkSaverView: ScreenSaverView {
 
     public override func setFrameSize(_ newSize: NSSize) {
         super.setFrameSize(newSize)
-        bgImageView?.frame = NSRect(origin: .zero, size: newSize)
         initMatrixRain()
     }
 
     // MARK: - Native Component Setup
 
     private func setupNativeComponents() {
-        self.wantsLayer = true
-        self.layer?.backgroundColor = colorBgDark.cgColor
-
         attrsMatrixGreen = [.font: fontMatrix, .foregroundColor: colorNeonGreen]
         attrsMatrixAmber = [.font: fontMatrix, .foregroundColor: colorNeonAmber]
 
-        // Load background image
+        // Load background image cleanly into memory
         let bundle = Bundle(for: type(of: self))
-        var bgImage: NSImage? = nil
         if let imgURL = bundle.url(forResource: "background", withExtension: "jpg", subdirectory: "WebContent/assets") {
             bgImage = NSImage(contentsOf: imgURL)
         } else if let imgURL = bundle.url(forResource: "background", withExtension: "jpg") {
             bgImage = NSImage(contentsOf: imgURL)
-        }
-
-        if let image = bgImage {
-            let iv = NSImageView(frame: self.bounds)
-            iv.image = image
-            iv.imageScaling = .scaleProportionallyUpOrDown
-            iv.autoresizingMask = [.width, .height]
-            self.addSubview(iv)
-            self.bgImageView = iv
         }
 
         initMatrixRain()
@@ -192,21 +177,36 @@ public class CyberpunkSaverView: ScreenSaverView {
         }
     }
 
-    // MARK: - Main Canvas Drawing Engine
+    // MARK: - Unified Single-Canvas Drawing Engine
 
     public override func draw(_ rect: NSRect) {
         super.draw(rect)
         guard let ctx = NSGraphicsContext.current?.cgContext else { return }
         let bounds = self.bounds
 
+        // 1. Draw Cyberpunk Balcony Background Image or Dark Gradient
+        if let img = bgImage {
+            img.draw(in: bounds, from: .zero, operation: .copy, fraction: 0.88)
+        } else {
+            colorBgDark.set()
+            bounds.fill()
+        }
+
+        // 2. Draw Ambient Cyan/Magenta Cyberpunk Fog Overlay
         drawAmbientGlow(in: ctx, bounds: bounds)
+
+        // 3. Draw 120 FPS Matrix Glyph Rain (25% Opacity)
         drawMatrixRain(in: ctx, bounds: bounds)
+
+        // 4. Draw Balcony Railing & Animated Black Cat
         drawBalconyCat(in: ctx, bounds: bounds)
 
+        // 5. Draw Nostromo HUD Telemetry Layer
         drawHUDHeader(in: ctx, bounds: bounds)
         drawHUDGridPanels(in: ctx, bounds: bounds)
         drawHUDFooter(in: ctx, bounds: bounds)
 
+        // 6. CRT Scanlines
         drawCRTScanlines(in: ctx, bounds: bounds)
     }
 
@@ -237,7 +237,7 @@ public class CyberpunkSaverView: ScreenSaverView {
         ctx.restoreGState()
     }
 
-    // MARK: - Optimized Matrix Rain Drawing
+    // MARK: - Matrix Rain Drawing
 
     private func drawMatrixRain(in ctx: CGContext, bounds: CGRect) {
         ctx.saveGState()
