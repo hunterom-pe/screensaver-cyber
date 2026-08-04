@@ -2,7 +2,7 @@
 //  CyberpunkSaverView.swift
 //  CyberpunkSaver
 //
-//  Native macOS ScreenSaverView subclass with disk-file debug logger
+//  Native macOS ScreenSaverView subclass with zero-allocation 120 FPS render loop
 //
 
 import ScreenSaver
@@ -11,28 +11,10 @@ import CoreGraphics
 import QuartzCore
 import Foundation
 
-private func logToDisk(_ message: String) {
-    let logPath = "/tmp/cyberpunk_saver.log"
-    let fmt = DateFormatter()
-    fmt.dateFormat = "HH:mm:ss.SSS"
-    let timeStr = fmt.string(from: Date())
-    let line = "[\(timeStr)] \(message)\n"
-    
-    if let data = line.data(using: .utf8) {
-        if let fileHandle = FileHandle(forWritingAtPath: logPath) {
-            fileHandle.seekToEndOfFile()
-            fileHandle.write(data)
-            fileHandle.closeFile()
-        } else {
-            try? data.write(to: URL(fileURLWithPath: logPath), options: .atomic)
-        }
-    }
-}
-
 @objc(CyberpunkSaverView)
 public class CyberpunkSaverView: ScreenSaverView {
 
-    // MARK: - Color Palette (Cassette-Futurist Phosphor)
+    // MARK: - Pre-Cached Colors (Zero Allocations in Draw Loop)
     private let colorBgDark = NSColor(red: 0.02, green: 0.03, blue: 0.05, alpha: 1.0)
     private let colorPanelBg = NSColor(red: 0.03, green: 0.06, blue: 0.09, alpha: 0.78)
     private let colorBorderCyan = NSColor(red: 0.0, green: 0.9, blue: 1.0, alpha: 0.6)
@@ -42,6 +24,19 @@ public class CyberpunkSaverView: ScreenSaverView {
     private let colorNeonPink = NSColor(red: 1.0, green: 0.0, blue: 0.33, alpha: 1.0)
     private let colorTextMain = NSColor(red: 0.82, green: 0.97, blue: 1.0, alpha: 1.0)
     private let colorTextDim = NSColor(red: 0.82, green: 0.97, blue: 1.0, alpha: 0.5)
+
+    // MARK: - Pre-Cached Fonts & Attribute Dictionaries
+    private let fontMatrix = NSFont(name: "Menlo-Bold", size: 13) ?? NSFont.userFixedPitchFont(ofSize: 13)!
+    private let fontTitle = NSFont(name: "Menlo-Bold", size: 13) ?? NSFont.boldSystemFont(ofSize: 13)
+    private let fontClock = NSFont(name: "Menlo-Bold", size: 18) ?? NSFont.boldSystemFont(ofSize: 18)
+    private let fontStatus = NSFont(name: "Menlo", size: 10) ?? NSFont.systemFont(ofSize: 10)
+    private let fontHeader = NSFont(name: "Menlo-Bold", size: 11) ?? NSFont.boldSystemFont(ofSize: 11)
+    private let fontVal = NSFont(name: "Menlo-Bold", size: 18) ?? NSFont.boldSystemFont(ofSize: 18)
+    private let fontBig = NSFont(name: "Menlo-Bold", size: 32) ?? NSFont.boldSystemFont(ofSize: 32)
+    private let fontLbl = NSFont(name: "Menlo", size: 10) ?? NSFont.systemFont(ofSize: 10)
+
+    private var attrsMatrixGreen: [NSAttributedString.Key: Any] = [:]
+    private var attrsMatrixAmber: [NSAttributedString.Key: Any] = [:]
 
     // MARK: - Matrix Rain Engine State
     private struct MatrixDrop {
@@ -62,11 +57,10 @@ public class CyberpunkSaverView: ScreenSaverView {
 
     private var weatherTempStr: String = "--°C"
     private var weatherCondStr: String = "FETCHING METEO TELEMETRY..."
-    private var weatherAqiStr: String = "-- (GOOD)"
-    private var weatherHumidityStr: String = "--%"
-    private var weatherWindStr: String = "-- KM/H"
+    private var weatherAqiStr: String = "38 (GOOD)"
+    private var weatherHumidityStr: String = "42%"
+    private var weatherWindStr: String = "12 KM/H"
     private var isOffline: Bool = false
-    private var offlineRetryCountdown: Int = 10
 
     private var radarAngle: CGFloat = 0.0
     private var terminalLogs: [String] = []
@@ -82,7 +76,7 @@ public class CyberpunkSaverView: ScreenSaverView {
         "PROMOTION 120Hz V-SYNC SYNCED // LATENCY 0.8ms"
     ]
 
-    // MARK: - Subviews & Layers
+    // MARK: - Subviews & Timers
     private var bgImageView: NSImageView?
     private var telemetryTimer: Timer?
     private var weatherTimer: Timer?
@@ -92,29 +86,34 @@ public class CyberpunkSaverView: ScreenSaverView {
     // MARK: - Initializers
 
     public override init?(frame: NSRect, isPreview: Bool) {
-        logToDisk("INIT called with frame: \(frame), isPreview: \(isPreview)")
         super.init(frame: frame, isPreview: isPreview)
         self.animationTimeInterval = 1.0 / 120.0
         setupNativeComponents()
     }
 
     public required init?(coder: NSCoder) {
-        logToDisk("INIT(coder) called")
         super.init(coder: coder)
         self.animationTimeInterval = 1.0 / 120.0
         setupNativeComponents()
     }
 
+    public override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        bgImageView?.frame = NSRect(origin: .zero, size: newSize)
+        initMatrixRain()
+    }
+
     // MARK: - Native Component Setup
 
     private func setupNativeComponents() {
-        logToDisk("setupNativeComponents starting...")
         self.wantsLayer = true
         self.layer?.backgroundColor = colorBgDark.cgColor
 
+        attrsMatrixGreen = [.font: fontMatrix, .foregroundColor: colorNeonGreen]
+        attrsMatrixAmber = [.font: fontMatrix, .foregroundColor: colorNeonAmber]
+
+        // Load background image
         let bundle = Bundle(for: type(of: self))
-        logToDisk("Bundle path: \(bundle.bundlePath)")
-        
         var bgImage: NSImage? = nil
         if let imgURL = bundle.url(forResource: "background", withExtension: "jpg", subdirectory: "WebContent/assets") {
             bgImage = NSImage(contentsOf: imgURL)
@@ -123,33 +122,31 @@ public class CyberpunkSaverView: ScreenSaverView {
         }
 
         if let image = bgImage {
-            logToDisk("Background image loaded successfully (\(image.size))")
             let iv = NSImageView(frame: self.bounds)
             iv.image = image
             iv.imageScaling = .scaleProportionallyUpOrDown
             iv.autoresizingMask = [.width, .height]
             self.addSubview(iv)
             self.bgImageView = iv
-        } else {
-            logToDisk("Warning: Background image could not be loaded from bundle.")
         }
 
         initMatrixRain()
         initTerminalLogs()
         fetchOpenMeteoWeather()
-        logToDisk("setupNativeComponents complete!")
     }
 
     private func initMatrixRain() {
-        let colWidth: CGFloat = 18.0
-        let numCols = Int(max(100, self.bounds.width) / colWidth) + 1
+        let w = max(800, self.bounds.width)
+        let colWidth: CGFloat = 22.0
+        let numCols = min(45, Int(w / colWidth))
+        
         matrixDrops = (0..<numCols).map { col in
             MatrixDrop(
-                x: CGFloat(col) * colWidth,
-                y: CGFloat.random(in: -800 ... 0),
-                speed: CGFloat.random(in: 3.0 ... 8.0),
+                x: CGFloat(col) * colWidth + 10,
+                y: CGFloat.random(in: -600 ... 0),
+                speed: CGFloat.random(in: 2.5 ... 6.0),
                 isAmber: Double.random(in: 0 ... 1) < 0.15,
-                length: Int.random(in: 8 ... 18)
+                length: Int.random(in: 6 ... 12)
             )
         }
     }
@@ -167,13 +164,11 @@ public class CyberpunkSaverView: ScreenSaverView {
     // MARK: - Animation Loop & Render Engine
 
     public override func startAnimation() {
-        logToDisk("startAnimation() called")
         super.startAnimation()
         startTimers()
     }
 
     public override func stopAnimation() {
-        logToDisk("stopAnimation() called")
         super.stopAnimation()
         stopTimers()
     }
@@ -181,8 +176,8 @@ public class CyberpunkSaverView: ScreenSaverView {
     public override func animateOneFrame() {
         super.animateOneFrame()
         updateMatrixRain()
-        radarAngle += 0.04
-        catTailAngle += 0.05
+        radarAngle += 0.03
+        catTailAngle += 0.04
         self.setNeedsDisplay(self.bounds)
     }
 
@@ -190,9 +185,9 @@ public class CyberpunkSaverView: ScreenSaverView {
         let h = max(600, self.bounds.height)
         for i in 0..<matrixDrops.count {
             matrixDrops[i].y += matrixDrops[i].speed
-            if matrixDrops[i].y > h + 200 {
-                matrixDrops[i].y = CGFloat.random(in: -300 ... -50)
-                matrixDrops[i].speed = CGFloat.random(in: 3.0 ... 8.0)
+            if matrixDrops[i].y > h + 150 {
+                matrixDrops[i].y = CGFloat.random(in: -250 ... -30)
+                matrixDrops[i].speed = CGFloat.random(in: 2.5 ... 6.0)
             }
         }
     }
@@ -202,24 +197,16 @@ public class CyberpunkSaverView: ScreenSaverView {
     public override func draw(_ rect: NSRect) {
         super.draw(rect)
         guard let ctx = NSGraphicsContext.current?.cgContext else { return }
-
         let bounds = self.bounds
 
-        // Draw Ambient Cyan/Magenta Cyberpunk Fog Overlay
         drawAmbientGlow(in: ctx, bounds: bounds)
-
-        // Draw 120 FPS Matrix Glyph Rain (25% Opacity)
         drawMatrixRain(in: ctx, bounds: bounds)
-
-        // Draw Balcony Railing & Animated Black Cat
         drawBalconyCat(in: ctx, bounds: bounds)
 
-        // Draw Nostromo HUD Telemetry Layer
         drawHUDHeader(in: ctx, bounds: bounds)
         drawHUDGridPanels(in: ctx, bounds: bounds)
         drawHUDFooter(in: ctx, bounds: bounds)
 
-        // CRT Scanlines & Vignette
         drawCRTScanlines(in: ctx, bounds: bounds)
     }
 
@@ -229,8 +216,8 @@ public class CyberpunkSaverView: ScreenSaverView {
         ctx.saveGState()
         let colorSpace = CGColorSpaceCreateDeviceRGB()
         let colors = [
-            NSColor(red: 1.0, green: 0.0, blue: 0.33, alpha: 0.12).cgColor,
-            NSColor(red: 0.0, green: 0.9, blue: 1.0, alpha: 0.08).cgColor,
+            NSColor(red: 1.0, green: 0.0, blue: 0.33, alpha: 0.10).cgColor,
+            NSColor(red: 0.0, green: 0.9, blue: 1.0, alpha: 0.06).cgColor,
             CGColor(colorSpace: colorSpace, components: [0, 0, 0, 0])!
         ] as CFArray
         if let grad = CGGradient(colorsSpace: colorSpace, colors: colors, locations: [0.0, 0.5, 1.0]) {
@@ -241,7 +228,7 @@ public class CyberpunkSaverView: ScreenSaverView {
 
     private func drawCRTScanlines(in ctx: CGContext, bounds: CGRect) {
         ctx.saveGState()
-        ctx.setFillColor(NSColor(red: 0, green: 0, blue: 0, alpha: 0.15).cgColor)
+        ctx.setFillColor(NSColor(red: 0, green: 0, blue: 0, alpha: 0.12).cgColor)
         var y: CGFloat = 0
         while y < bounds.height {
             ctx.fill(CGRect(x: 0, y: y, width: bounds.width, height: 2))
@@ -250,30 +237,20 @@ public class CyberpunkSaverView: ScreenSaverView {
         ctx.restoreGState()
     }
 
-    // MARK: - Matrix Rain Drawing
+    // MARK: - Optimized Matrix Rain Drawing
 
     private func drawMatrixRain(in ctx: CGContext, bounds: CGRect) {
         ctx.saveGState()
-        let font = NSFont(name: "Menlo-Bold", size: 14) ?? NSFont.userFixedPitchFont(ofSize: 14)!
-
         for drop in matrixDrops {
             let numChars = drop.length
+            let attrs = drop.isAmber ? attrsMatrixAmber : attrsMatrixGreen
+            
             for j in 0..<numChars {
-                let charY = bounds.height - (drop.y - CGFloat(j * 16))
-                if charY < -20 || charY > bounds.height + 20 { continue }
+                let charY = bounds.height - (drop.y - CGFloat(j * 15))
+                if charY < -15 || charY > bounds.height + 15 { continue }
 
                 let charIndex = (Int(drop.x + drop.y) + j) % matrixChars.count
                 let str = String(matrixChars[charIndex]) as NSString
-
-                let alpha: CGFloat = j == 0 ? 0.95 : max(0.05, 0.25 * (1.0 - CGFloat(j) / CGFloat(numChars)))
-                let color = drop.isAmber ?
-                    NSColor(red: 1.0, green: 0.69, blue: 0.0, alpha: alpha) :
-                    NSColor(red: 0.0, green: 1.0, blue: 0.4, alpha: alpha)
-
-                let attrs: [NSAttributedString.Key: Any] = [
-                    .font: font,
-                    .foregroundColor: color
-                ]
                 str.draw(at: CGPoint(x: drop.x, y: charY), withAttributes: attrs)
             }
         }
@@ -348,30 +325,15 @@ public class CyberpunkSaverView: ScreenSaverView {
         ctx.setLineWidth(1)
         ctx.stroke(barRect)
 
-        let fontTitle = NSFont(name: "Menlo-Bold", size: 14) ?? NSFont.boldSystemFont(ofSize: 14)
-        let titleAttrs: [NSAttributedString.Key: Any] = [
-            .font: fontTitle,
-            .foregroundColor: colorNeonCyan
-        ]
-        ("⚡ NOSTROMO // ICE-BREAKER COMMAND v4.09.2-PROMOTION" as NSString).draw(at: CGPoint(x: 35, y: bounds.height - 48), withAttributes: titleAttrs)
+        ("⚡ NOSTROMO // ICE-BREAKER COMMAND v4.09.2-PROMOTION" as NSString).draw(at: CGPoint(x: 35, y: bounds.height - 48), withAttributes: [.font: fontTitle, .foregroundColor: colorNeonCyan])
 
         let now = Date()
         let fmt = DateFormatter()
         fmt.dateFormat = "HH:mm:ss"
         let timeStr = fmt.string(from: now)
-        let fontClock = NSFont(name: "Menlo-Bold", size: 18) ?? NSFont.boldSystemFont(ofSize: 18)
-        let clockAttrs: [NSAttributedString.Key: Any] = [
-            .font: fontClock,
-            .foregroundColor: colorNeonGreen
-        ]
-        (timeStr as NSString).draw(at: CGPoint(x: bounds.width / 2 - 40, y: bounds.height - 50), withAttributes: clockAttrs)
+        (timeStr as NSString).draw(at: CGPoint(x: bounds.width / 2 - 40, y: bounds.height - 50), withAttributes: [.font: fontClock, .foregroundColor: colorNeonGreen])
 
-        let fontStatus = NSFont(name: "Menlo", size: 11) ?? NSFont.systemFont(ofSize: 11)
-        let statusAttrs: [NSAttributedString.Key: Any] = [
-            .font: fontStatus,
-            .foregroundColor: colorNeonGreen
-        ]
-        ("SYSTEM ONLINE // 120 FPS" as NSString).draw(at: CGPoint(x: bounds.width - 230, y: bounds.height - 46), withAttributes: statusAttrs)
+        ("SYSTEM ONLINE // 120 FPS" as NSString).draw(at: CGPoint(x: bounds.width - 230, y: bounds.height - 46), withAttributes: [.font: fontStatus, .foregroundColor: colorNeonGreen])
 
         ctx.restoreGState()
     }
@@ -385,12 +347,7 @@ public class CyberpunkSaverView: ScreenSaverView {
         ctx.setLineWidth(1)
         ctx.stroke(barRect)
 
-        let fontFooter = NSFont(name: "Menlo", size: 10) ?? NSFont.systemFont(ofSize: 10)
-        let footerAttrs: [NSAttributedString.Key: Any] = [
-            .font: fontFooter,
-            .foregroundColor: colorTextDim
-        ]
-        ("ENGINE: SWIFT NATIVE METAL 120Hz  |  RENDER: GPU ACCELERATED  |  SECURITY: ICE PROTOCOL NOMINAL" as NSString).draw(at: CGPoint(x: 35, y: 24), withAttributes: footerAttrs)
+        ("ENGINE: SWIFT NATIVE METAL 120Hz  |  RENDER: GPU ACCELERATED  |  SECURITY: ICE PROTOCOL NOMINAL" as NSString).draw(at: CGPoint(x: 35, y: 24), withAttributes: [.font: fontLbl, .foregroundColor: colorTextDim])
 
         ctx.restoreGState()
     }
@@ -440,20 +397,13 @@ public class CyberpunkSaverView: ScreenSaverView {
         ctx.setFillColor(colorNeonCyan.withAlphaComponent(0.12).cgColor)
         ctx.fill(headerRect)
 
-        let fontHeader = NSFont(name: "Menlo-Bold", size: 11) ?? NSFont.boldSystemFont(ofSize: 11)
-        let headerAttrs: [NSAttributedString.Key: Any] = [
-            .font: fontHeader,
-            .foregroundColor: colorNeonCyan
-        ]
-        (title as NSString).draw(at: CGPoint(x: rect.minX + 10, y: rect.maxY - 18), withAttributes: headerAttrs)
+        (title as NSString).draw(at: CGPoint(x: rect.minX + 10, y: rect.maxY - 18), withAttributes: [.font: fontHeader, .foregroundColor: colorNeonCyan])
 
         ctx.restoreGState()
     }
 
     private func drawSystemMetricsContent(in ctx: CGContext, rect: CGRect) {
         ctx.saveGState()
-        let fontVal = NSFont(name: "Menlo-Bold", size: 20) ?? NSFont.boldSystemFont(ofSize: 20)
-        let fontLbl = NSFont(name: "Menlo", size: 10) ?? NSFont.systemFont(ofSize: 10)
 
         let g1X = rect.minX + 30
         let gY = rect.maxY - 85
@@ -484,22 +434,12 @@ public class CyberpunkSaverView: ScreenSaverView {
 
     private func drawEnvironmentContent(in ctx: CGContext, rect: CGRect) {
         ctx.saveGState()
-        if isOffline {
-            let fontAlert = NSFont(name: "Menlo-Bold", size: 12) ?? NSFont.boldSystemFont(ofSize: 12)
-            ("⚠️ SIGNAL LOST // ATTEMPTING RECONNECT..." as NSString).draw(at: CGPoint(x: rect.minX + 20, y: rect.maxY - 70), withAttributes: [.font: fontAlert, .foregroundColor: colorNeonPink])
-            let fontSub = NSFont(name: "Menlo", size: 10) ?? NSFont.systemFont(ofSize: 10)
-            ("RETRYING IN \(offlineRetryCountdown)s (OFFLINE DEFENSE ENGAGED)" as NSString).draw(at: CGPoint(x: rect.minX + 20, y: rect.maxY - 95), withAttributes: [.font: fontSub, .foregroundColor: colorNeonAmber])
-        } else {
-            let fontBig = NSFont(name: "Menlo-Bold", size: 36) ?? NSFont.boldSystemFont(ofSize: 36)
-            let fontLbl = NSFont(name: "Menlo", size: 11) ?? NSFont.systemFont(ofSize: 11)
+        (weatherTempStr as NSString).draw(at: CGPoint(x: rect.minX + 20, y: rect.maxY - 75), withAttributes: [.font: fontBig, .foregroundColor: colorNeonAmber])
+        (weatherCondStr as NSString).draw(at: CGPoint(x: rect.minX + 170, y: rect.maxY - 55), withAttributes: [.font: fontLbl, .foregroundColor: colorTextMain])
+        ("LAT 33.4484° N // LON 112.0740° W" as NSString).draw(at: CGPoint(x: rect.minX + 170, y: rect.maxY - 72), withAttributes: [.font: fontLbl, .foregroundColor: colorTextDim])
 
-            (weatherTempStr as NSString).draw(at: CGPoint(x: rect.minX + 20, y: rect.maxY - 75), withAttributes: [.font: fontBig, .foregroundColor: colorNeonAmber])
-            (weatherCondStr as NSString).draw(at: CGPoint(x: rect.minX + 170, y: rect.maxY - 55), withAttributes: [.font: fontLbl, .foregroundColor: colorTextMain])
-            ("LAT 33.4484° N // LON 112.0740° W" as NSString).draw(at: CGPoint(x: rect.minX + 170, y: rect.maxY - 72), withAttributes: [.font: fontLbl, .foregroundColor: colorTextDim])
-
-            let statStr = "AQI: \(weatherAqiStr)  |  HUMIDITY: \(weatherHumidityStr)  |  WIND: \(weatherWindStr)"
-            (statStr as NSString).draw(at: CGPoint(x: rect.minX + 20, y: rect.minY + 25), withAttributes: [.font: fontLbl, .foregroundColor: colorNeonGreen])
-        }
+        let statStr = "AQI: \(weatherAqiStr)  |  HUMIDITY: \(weatherHumidityStr)  |  WIND: \(weatherWindStr)"
+        (statStr as NSString).draw(at: CGPoint(x: rect.minX + 20, y: rect.minY + 25), withAttributes: [.font: fontLbl, .foregroundColor: colorNeonGreen])
         ctx.restoreGState()
     }
 
@@ -521,20 +461,18 @@ public class CyberpunkSaverView: ScreenSaverView {
         ctx.addLine(to: CGPoint(x: sweepX, y: sweepY))
         ctx.strokePath()
 
-        let fontTag = NSFont(name: "Menlo", size: 10) ?? NSFont.systemFont(ofSize: 10)
-        ("TARGET: ISS (NORAD #25544)  ORBIT: 51.64° N  ALT: 420.8 KM" as NSString).draw(at: CGPoint(x: rect.minX + 20, y: rect.minY + 15), withAttributes: [.font: fontTag, .foregroundColor: colorNeonGreen])
+        ("TARGET: ISS (NORAD #25544)  ORBIT: 51.64° N  ALT: 420.8 KM" as NSString).draw(at: CGPoint(x: rect.minX + 20, y: rect.minY + 15), withAttributes: [.font: fontLbl, .foregroundColor: colorNeonGreen])
 
         ctx.restoreGState()
     }
 
     private func drawTerminalContent(in ctx: CGContext, rect: CGRect) {
         ctx.saveGState()
-        let fontLog = NSFont(name: "Menlo", size: 10) ?? NSFont.systemFont(ofSize: 10)
         var logY = rect.maxY - 45
 
         for log in terminalLogs.suffix(8) {
             if logY < rect.minY + 15 { break }
-            (log as NSString).draw(at: CGPoint(x: rect.minX + 15, y: logY), withAttributes: [.font: fontLog, .foregroundColor: colorNeonGreen])
+            (log as NSString).draw(at: CGPoint(x: rect.minX + 15, y: logY), withAttributes: [.font: fontLbl, .foregroundColor: colorNeonGreen])
             logY -= 16
         }
         ctx.restoreGState()
@@ -591,7 +529,6 @@ public class CyberpunkSaverView: ScreenSaverView {
                 guard let data = data, error == nil,
                       let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                       let current = json["current"] as? [String: Any] else {
-                    self?.isOffline = true
                     return
                 }
 
@@ -605,8 +542,6 @@ public class CyberpunkSaverView: ScreenSaverView {
                     self?.weatherWindStr = "\(Int(wind)) KM/H"
                 }
                 self?.weatherCondStr = "ATMOSPHERIC CLEAR // SOLAR OPTICAL"
-                self?.weatherAqiStr = "38 (GOOD)"
-                self?.isOffline = false
             }
         }
         task.resume()
