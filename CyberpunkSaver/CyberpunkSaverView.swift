@@ -2,9 +2,9 @@
 //  CyberpunkSaverView.swift
 //  CyberpunkSaver
 //
-//  Native macOS ScreenSaverView subclass featuring BOLD, PROMINENT, UNDENIABLY VISIBLE
-//  Blade Runner Cyberpunk Effects: Pulsing Neon Halos, Tactical Targeting Frame, Cat Aura,
-//  CRT Chromatic Glitch, and Frosted Glass Telemetry Badges.
+//  Native macOS ScreenSaverView subclass featuring clean, high-contrast Option 1
+//  Frosted Glass Telemetry Badges with 12-Hour Clock, Phoenix Open-Meteo Weather,
+//  System Metrics, and zero extra overlays.
 //
 
 import ScreenSaver
@@ -18,16 +18,16 @@ public class CyberpunkSaverView: ScreenSaverView {
 
     // MARK: - Pre-Cached Colors
     private let colorBgDark = NSColor(red: 0.02, green: 0.03, blue: 0.05, alpha: 1.0)
-    private let colorBadgeBg = NSColor(red: 0.03, green: 0.07, blue: 0.12, alpha: 0.88)
-    private let colorBorderCyan = NSColor(red: 0.0, green: 0.9, blue: 1.0, alpha: 0.85)
-    private let colorBorderGreen = NSColor(red: 0.0, green: 1.0, blue: 0.4, alpha: 0.85)
+    private let colorBadgeBg = NSColor(red: 0.02, green: 0.05, blue: 0.09, alpha: 0.85)
+    private let colorBorderCyan = NSColor(red: 0.0, green: 0.9, blue: 1.0, alpha: 0.7)
+    private let colorBorderGreen = NSColor(red: 0.0, green: 1.0, blue: 0.4, alpha: 0.7)
     
     private let colorNeonGreen = NSColor(red: 0.0, green: 1.0, blue: 0.4, alpha: 1.0)
     private let colorNeonCyan = NSColor(red: 0.0, green: 0.9, blue: 1.0, alpha: 1.0)
     private let colorNeonAmber = NSColor(red: 1.0, green: 0.69, blue: 0.0, alpha: 1.0)
-    private let colorNeonPink = NSColor(red: 1.0, green: 0.0, blue: 0.45, alpha: 1.0)
-    private let colorTextMain = NSColor(red: 0.90, green: 0.98, blue: 1.0, alpha: 1.0)
-    private let colorTextDim = NSColor(red: 0.90, green: 0.98, blue: 1.0, alpha: 0.65)
+    private let colorNeonPink = NSColor(red: 1.0, green: 0.0, blue: 0.33, alpha: 1.0)
+    private let colorTextMain = NSColor(red: 0.88, green: 0.97, blue: 1.0, alpha: 1.0)
+    private let colorTextDim = NSColor(red: 0.88, green: 0.97, blue: 1.0, alpha: 0.6)
 
     // MARK: - Pre-Cached Fonts
     private let fontClock = NSFont(name: "Menlo-Bold", size: 24) ?? NSFont.boldSystemFont(ofSize: 24)
@@ -36,13 +36,7 @@ public class CyberpunkSaverView: ScreenSaverView {
     private let fontTagRegular = NSFont(name: "Menlo", size: 12) ?? NSFont.systemFont(ofSize: 12)
     private let fontSmall = NSFont(name: "Menlo", size: 11) ?? NSFont.systemFont(ofSize: 11)
 
-    // MARK: - Animation States
-    private var pulseAngle: CGFloat = 0.0
-    private var radarAngle: CGFloat = 0.0
-    private var glitchTimer: CGFloat = 0.0
-    private var activeGlitchShift: CGFloat = 0.0
-
-    // MARK: - Telemetry State
+    // MARK: - Telemetry & Terminal State
     private var cpuLoad: Int = 34
     private var ramPressure: Int = 62
     private var batReserve: Int = 98
@@ -77,13 +71,13 @@ public class CyberpunkSaverView: ScreenSaverView {
 
     public override init?(frame: NSRect, isPreview: Bool) {
         super.init(frame: frame, isPreview: isPreview)
-        self.animationTimeInterval = 1.0 / 60.0 // Smooth 60 FPS animation loop
+        self.animationTimeInterval = 1.0 / 30.0
         setupNativeComponents()
     }
 
     public required init?(coder: NSCoder) {
         super.init(coder: coder)
-        self.animationTimeInterval = 1.0 / 60.0
+        self.animationTimeInterval = 1.0 / 30.0
         setupNativeComponents()
     }
 
@@ -114,21 +108,6 @@ public class CyberpunkSaverView: ScreenSaverView {
 
     public override func animateOneFrame() {
         super.animateOneFrame()
-        pulseAngle += 0.05
-        radarAngle += 0.04
-        glitchTimer += 0.016
-
-        // Periodic CRT Chromatic Glitch Flash every 10 seconds
-        if glitchTimer > 10.0 {
-            activeGlitchShift = sin(glitchTimer * 90) * 8.0
-            if glitchTimer > 10.25 {
-                glitchTimer = 0.0
-                activeGlitchShift = 0.0
-            }
-        } else {
-            activeGlitchShift = 0.0
-        }
-
         self.setNeedsDisplay(self.bounds)
     }
 
@@ -139,177 +118,33 @@ public class CyberpunkSaverView: ScreenSaverView {
         guard let ctx = NSGraphicsContext.current?.cgContext else { return }
         let bounds = self.bounds
 
-        // Apply Glitch Shift
-        if activeGlitchShift != 0 {
-            ctx.saveGState()
-            ctx.translateBy(x: activeGlitchShift, y: 0)
-        }
-
-        // 1. Draw Cyberpunk Balcony Background Image
+        // 1. Draw Cyberpunk Balcony Cat Background Image
         if let img = bgImage {
-            img.draw(in: bounds, from: .zero, operation: .sourceOver, fraction: 1.0)
+            img.draw(in: bounds, from: .zero, operation: .copy, fraction: 1.0)
         } else {
             colorBgDark.set()
             bounds.fill()
         }
 
-        // 2. Draw Prominent Breathing Neon Beacon Halos (Skyscrapers & Skybridges)
-        drawBreathingNeonHalos(in: ctx, bounds: bounds)
-
-        // 3. Draw Bold Tactical Reticle & Radar Sweep Frame (Targeting City Skyline)
-        drawTacticalTargetingReticle(in: ctx, bounds: bounds)
-
-        // 4. Draw Cat Neon Aura & Cybernetic Eye Pulse
-        drawCatNeonAura(in: ctx, bounds: bounds)
-
-        // 5. Draw Option 1 High-Contrast Glass Telemetry Badges
+        // 2. Option 1 High-Contrast Glass Telemetry Badges
         drawTopLeftClockBadge(in: ctx, bounds: bounds)
         drawTopRightWeatherBadge(in: ctx, bounds: bounds)
         drawBottomLeftTerminalBadge(in: ctx, bounds: bounds)
         drawBottomRightMetricsBadge(in: ctx, bounds: bounds)
 
-        // 6. CRT Scanlines Overlay
+        // 3. Subtle CRT Scanlines
         drawCRTScanlines(in: ctx, bounds: bounds)
-
-        if activeGlitchShift != 0 {
-            ctx.restoreGState()
-        }
     }
 
-    // MARK: - 2. Prominent Breathing Neon Beacon Halos
+    // MARK: - Option 1 Badge Renderers
 
-    private func drawBreathingNeonHalos(in ctx: CGContext, bounds: CGRect) {
-        ctx.saveGState()
-        let pulseAlpha = (sin(pulseAngle * 1.8) * 0.35 + 0.65)
-        let colorSpace = CGColorSpaceCreateDeviceRGB()
-
-        let beaconPoints: [(CGPoint, NSColor, CGFloat)] = [
-            (CGPoint(x: bounds.width * 0.28, y: bounds.height * 0.82), colorNeonCyan, 60),
-            (CGPoint(x: bounds.width * 0.53, y: bounds.height * 0.76), colorNeonAmber, 75),
-            (CGPoint(x: bounds.width * 0.82, y: bounds.height * 0.88), colorNeonPink, 65)
-        ]
-
-        for (pt, color, radius) in beaconPoints {
-            let colors = [
-                color.withAlphaComponent(pulseAlpha * 0.85).cgColor,
-                color.withAlphaComponent(pulseAlpha * 0.3).cgColor,
-                CGColor(colorSpace: colorSpace, components: [0, 0, 0, 0])!
-            ] as CFArray
-
-            if let grad = CGGradient(colorsSpace: colorSpace, colors: colors, locations: [0.0, 0.4, 1.0]) {
-                ctx.drawRadialGradient(grad, startCenter: pt, startRadius: 2, endCenter: pt, endRadius: radius, options: [])
-            }
-
-            // Solid Beacon Core
-            ctx.setFillColor(NSColor.white.cgColor)
-            ctx.fillEllipse(in: CGRect(x: pt.x - 4, y: pt.y - 4, width: 8, height: 8))
-        }
-        ctx.restoreGState()
-    }
-
-    // MARK: - 3. Bold Tactical Reticle & Radar Sweep Frame
-
-    private func drawTacticalTargetingReticle(in ctx: CGContext, bounds: CGRect) {
-        ctx.saveGState()
-        let centerPt = CGPoint(x: bounds.width * 0.48, y: bounds.height * 0.58)
-        let frameW: CGFloat = 240
-        let frameH: CGFloat = 160
-        let frameRect = CGRect(x: centerPt.x - frameW/2, y: centerPt.y - frameH/2, width: frameW, height: frameH)
-
-        // Wireframe Corners
-        ctx.setStrokeColor(colorNeonCyan.cgColor)
-        ctx.setLineWidth(2.5)
-        let cornerLen: CGFloat = 20
-
-        // TL Corner
-        ctx.move(to: CGPoint(x: frameRect.minX, y: frameRect.maxY - cornerLen))
-        ctx.addLine(to: CGPoint(x: frameRect.minX, y: frameRect.maxY))
-        ctx.addLine(to: CGPoint(x: frameRect.minX + cornerLen, y: frameRect.maxY))
-        ctx.strokePath()
-
-        // TR Corner
-        ctx.move(to: CGPoint(x: frameRect.maxX - cornerLen, y: frameRect.maxY))
-        ctx.addLine(to: CGPoint(x: frameRect.maxX, y: frameRect.maxY))
-        ctx.addLine(to: CGPoint(x: frameRect.maxX, y: frameRect.maxY - cornerLen))
-        ctx.strokePath()
-
-        // BL Corner
-        ctx.move(to: CGPoint(x: frameRect.minX, y: frameRect.minY + cornerLen))
-        ctx.addLine(to: CGPoint(x: frameRect.minX, y: frameRect.minY))
-        ctx.addLine(to: CGPoint(x: frameRect.minX + cornerLen, y: frameRect.minY))
-        ctx.strokePath()
-
-        // BR Corner
-        ctx.move(to: CGPoint(x: frameRect.maxX - cornerLen, y: frameRect.minY))
-        ctx.addLine(to: CGPoint(x: frameRect.maxX, y: frameRect.minY))
-        ctx.addLine(to: CGPoint(x: frameRect.maxX, y: frameRect.minY + cornerLen))
-        ctx.strokePath()
-
-        // Center Crosshair
-        ctx.setStrokeColor(colorNeonPink.withAlphaComponent(0.9).cgColor)
-        ctx.setLineWidth(1.5)
-        ctx.strokeEllipse(in: CGRect(x: centerPt.x - 12, y: centerPt.y - 12, width: 24, height: 24))
-        ctx.move(to: CGPoint(x: centerPt.x - 20, y: centerPt.y))
-        ctx.addLine(to: CGPoint(x: centerPt.x + 20, y: centerPt.y))
-        ctx.move(to: CGPoint(x: centerPt.x, y: centerPt.y - 20))
-        ctx.addLine(to: CGPoint(x: centerPt.x, y: centerPt.y + 20))
-        ctx.strokePath()
-
-        // Radar Sweep Line
-        ctx.setStrokeColor(colorNeonGreen.cgColor)
-        ctx.setLineWidth(2.0)
-        ctx.move(to: centerPt)
-        let sweepX = centerPt.x + cos(radarAngle) * (frameW / 2)
-        let sweepY = centerPt.y + sin(radarAngle) * (frameH / 2)
-        ctx.addLine(to: CGPoint(x: sweepX, y: sweepY))
-        ctx.strokePath()
-
-        // Reticle Tag
-        let tagText = "TARGET: CHIBA METROPOLIS // LOCK: 100%"
-        (tagText as NSString).draw(at: CGPoint(x: frameRect.minX + 8, y: frameRect.minY - 18), withAttributes: [
-            .font: fontSmall,
-            .foregroundColor: colorNeonGreen
-        ])
-
-        ctx.restoreGState()
-    }
-
-    // MARK: - 4. Cat Neon Aura & Eye Pulse
-
-    private func drawCatNeonAura(in ctx: CGContext, bounds: CGRect) {
-        ctx.saveGState()
-        let catX = bounds.width * 0.65
-        let catY = bounds.height * 0.42
-        let pulseAlpha = (sin(pulseAngle * 2.2) * 0.4 + 0.6)
-        let colorSpace = CGColorSpaceCreateDeviceRGB()
-
-        // Vibrant Neon Cyan Pool under Cat
-        let colors = [
-            colorNeonCyan.withAlphaComponent(pulseAlpha * 0.7).cgColor,
-            colorNeonCyan.withAlphaComponent(pulseAlpha * 0.25).cgColor,
-            CGColor(colorSpace: colorSpace, components: [0, 0, 0, 0])!
-        ] as CFArray
-
-        if let grad = CGGradient(colorsSpace: colorSpace, colors: colors, locations: [0.0, 0.4, 1.0]) {
-            ctx.drawRadialGradient(grad, startCenter: CGPoint(x: catX, y: catY), startRadius: 5, endCenter: CGPoint(x: catX, y: catY), endRadius: 80, options: [])
-        }
-
-        // Glowing Cat Eyes
-        ctx.setFillColor(colorNeonCyan.cgColor)
-        ctx.fillEllipse(in: CGRect(x: catX - 4, y: catY + 36, width: 5, height: 6))
-        ctx.fillEllipse(in: CGRect(x: catX + 6, y: catY + 36, width: 5, height: 6))
-
-        ctx.restoreGState()
-    }
-
-    // MARK: - 5. Option 1 High-Contrast Glass Telemetry Badges
-
+    // TOP LEFT: 12-Hour Clock & Full Date Badge
     private func drawTopLeftClockBadge(in ctx: CGContext, bounds: CGRect) {
         ctx.saveGState()
         let now = Date()
 
         let fmtTime = DateFormatter()
-        fmtTime.dateFormat = "hh:mm:ss a"
+        fmtTime.dateFormat = "hh:mm:ss a" // 12-Hour format with AM/PM
         let timeStr = fmtTime.string(from: now)
 
         let fmtDate = DateFormatter()
@@ -319,17 +154,22 @@ public class CyberpunkSaverView: ScreenSaverView {
         let badgeRect = CGRect(x: 32, y: bounds.height - 92, width: 300, height: 64)
         drawGlassPanel(in: ctx, rect: badgeRect, borderColor: colorBorderGreen)
 
+        // 12-Hour Clock Text
         (timeStr as NSString).draw(at: CGPoint(x: 48, y: bounds.height - 62), withAttributes: [
             .font: fontClock,
             .foregroundColor: colorNeonGreen
         ])
+
+        // Date Text Below
         (dateStr as NSString).draw(at: CGPoint(x: 48, y: bounds.height - 84), withAttributes: [
             .font: fontDate,
             .foregroundColor: colorTextDim
         ])
+
         ctx.restoreGState()
     }
 
+    // TOP RIGHT: Phoenix Weather & AQI Pill Badge
     private func drawTopRightWeatherBadge(in ctx: CGContext, bounds: CGRect) {
         ctx.saveGState()
         let badgeW: CGFloat = 360
@@ -361,6 +201,7 @@ public class CyberpunkSaverView: ScreenSaverView {
         ctx.restoreGState()
     }
 
+    // BOTTOM LEFT: 2-Line Mini Terminal Badge
     private func drawBottomLeftTerminalBadge(in ctx: CGContext, bounds: CGRect) {
         ctx.saveGState()
         let badgeRect = CGRect(x: 32, y: 32, width: 500, height: 60)
@@ -380,6 +221,7 @@ public class CyberpunkSaverView: ScreenSaverView {
         ctx.restoreGState()
     }
 
+    // BOTTOM RIGHT: Micro System Gauges & ISS Orbit Badge
     private func drawBottomRightMetricsBadge(in ctx: CGContext, bounds: CGRect) {
         ctx.saveGState()
         let badgeW: CGFloat = 450
@@ -412,13 +254,13 @@ public class CyberpunkSaverView: ScreenSaverView {
         path.fill()
 
         borderColor.set()
-        path.lineWidth = 2.0
+        path.lineWidth = 1.5
         path.stroke()
 
         // Sci-Fi Corner Tick Accents
         ctx.setStrokeColor(colorNeonCyan.cgColor)
-        ctx.setLineWidth(2.5)
-        let tick: CGFloat = 8
+        ctx.setLineWidth(2.0)
+        let tick: CGFloat = 6
         ctx.move(to: CGPoint(x: rect.minX, y: rect.maxY - tick))
         ctx.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
         ctx.addLine(to: CGPoint(x: rect.minX + tick, y: rect.maxY))
