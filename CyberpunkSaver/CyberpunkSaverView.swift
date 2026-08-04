@@ -2,8 +2,8 @@
 //  CyberpunkSaverView.swift
 //  CyberpunkSaver
 //
-//  Native macOS ScreenSaverView subclass featuring a lightweight, borderless
-//  cassette-futurist HUD telemetry overlay without matrix rain or heavy boxes.
+//  Native macOS ScreenSaverView subclass featuring Option 1:
+//  High-Contrast Glowing Glass Badges with 12-Hour Clock & 100% Legible Telemetry
 //
 
 import ScreenSaver
@@ -17,15 +17,20 @@ public class CyberpunkSaverView: ScreenSaverView {
 
     // MARK: - Pre-Cached Colors
     private let colorBgDark = NSColor(red: 0.02, green: 0.03, blue: 0.05, alpha: 1.0)
+    private let colorBadgeBg = NSColor(red: 0.03, green: 0.06, blue: 0.10, alpha: 0.78)
+    private let colorBorderCyan = NSColor(red: 0.0, green: 0.9, blue: 1.0, alpha: 0.5)
+    private let colorBorderGreen = NSColor(red: 0.0, green: 1.0, blue: 0.4, alpha: 0.5)
+    
     private let colorNeonGreen = NSColor(red: 0.0, green: 1.0, blue: 0.4, alpha: 1.0)
     private let colorNeonCyan = NSColor(red: 0.0, green: 0.9, blue: 1.0, alpha: 1.0)
     private let colorNeonAmber = NSColor(red: 1.0, green: 0.69, blue: 0.0, alpha: 1.0)
     private let colorNeonPink = NSColor(red: 1.0, green: 0.0, blue: 0.33, alpha: 1.0)
-    private let colorTextMain = NSColor(red: 0.85, green: 0.97, blue: 1.0, alpha: 1.0)
-    private let colorTextDim = NSColor(red: 0.85, green: 0.97, blue: 1.0, alpha: 0.55)
-    private let colorWidgetBg = NSColor(red: 0.02, green: 0.05, blue: 0.08, alpha: 0.5)
+    private let colorTextMain = NSColor(red: 0.88, green: 0.97, blue: 1.0, alpha: 1.0)
+    private let colorTextDim = NSColor(red: 0.88, green: 0.97, blue: 1.0, alpha: 0.6)
 
     // MARK: - Pre-Cached Fonts
+    private let fontClock = NSFont(name: "Menlo-Bold", size: 22) ?? NSFont.boldSystemFont(ofSize: 22)
+    private let fontDate = NSFont(name: "Menlo-Bold", size: 12) ?? NSFont.boldSystemFont(ofSize: 12)
     private let fontTagBold = NSFont(name: "Menlo-Bold", size: 12) ?? NSFont.boldSystemFont(ofSize: 12)
     private let fontTagRegular = NSFont(name: "Menlo", size: 11) ?? NSFont.systemFont(ofSize: 11)
     private let fontSmall = NSFont(name: "Menlo", size: 10) ?? NSFont.systemFont(ofSize: 10)
@@ -35,13 +40,15 @@ public class CyberpunkSaverView: ScreenSaverView {
     private var ramPressure: Int = 62
     private var batReserve: Int = 98
 
-    private var weatherTempStr: String = "--°C"
-    private var weatherCondStr: String = "FETCHING METEO..."
-    private var weatherAqiStr: String = "AQI 38"
+    private var weatherTempC: Double = 38.0
+    private var weatherTempStr: String = "38°C / 100°F"
+    private var weatherCondStr: String = "CLEAR SOLAR"
+    private var weatherAqiStr: String = "AQI 38 (GOOD)"
     private var weatherWindStr: String = "12 KM/H"
     private var isOffline: Bool = false
 
-    private var currentLogLine: String = "[14:09:24] KUANG-DENG 0.9 // MATRIX SYNC NOMINAL"
+    private var currentLogLine: String = "KUANG-DENG 0.9 // MATRIX LINK NOMINAL"
+    private var secondaryLogLine: String = "SHIVA DECRYPTION NODES SYNCED"
     private let logTemplates = [
         "KUANG-DENG 0.9 // INITIATING NEURAL MATRIX LINK...",
         "BYPASSING CHIBA CITY BACKBONE FIREWALL [GATE 0x8F4A]",
@@ -51,12 +58,11 @@ public class CyberpunkSaverView: ScreenSaverView {
         "CYBER-DEFENSE PULSE NEUTRALIZED. RETAINING ZERO-TRACE.",
         "HOST MEMORY ALLOCATION: 0x00FF8800 [BUFFER STABLE]",
         "OPEN-METEO TELEMETRY SYNCED // PHOENIX NODES RESPONDING",
-        "PROMOTION DISPLAY SYNCED // Latency 0.8ms"
+        "PROMOTION DISPLAY SYNCED // LATENCY 0.8ms"
     ]
 
     // MARK: - Assets & Timers
     private var bgImage: NSImage?
-    private var renderTimer: Timer?
     private var telemetryTimer: Timer?
     private var weatherTimer: Timer?
     private var terminalTimer: Timer?
@@ -65,7 +71,7 @@ public class CyberpunkSaverView: ScreenSaverView {
 
     public override init?(frame: NSRect, isPreview: Bool) {
         super.init(frame: frame, isPreview: isPreview)
-        self.animationTimeInterval = 1.0 / 30.0 // Smooth 30 FPS timer interval for low CPU load
+        self.animationTimeInterval = 1.0 / 30.0 // Smooth 30 FPS update interval
         setupNativeComponents()
     }
 
@@ -88,7 +94,7 @@ public class CyberpunkSaverView: ScreenSaverView {
         fetchOpenMeteoWeather()
     }
 
-    // MARK: - Animation Loop & Render Engine
+    // MARK: - Animation Loop
 
     public override func startAnimation() {
         super.startAnimation()
@@ -105,7 +111,7 @@ public class CyberpunkSaverView: ScreenSaverView {
         self.setNeedsDisplay(self.bounds)
     }
 
-    // MARK: - Lightweight Unified Single-Canvas Drawing Engine
+    // MARK: - Unified Drawing Engine
 
     public override func draw(_ rect: NSRect) {
         super.draw(rect)
@@ -120,98 +126,146 @@ public class CyberpunkSaverView: ScreenSaverView {
             bounds.fill()
         }
 
-        // 2. Minimalist Floating Corner HUD Elements (No Boxes / Quadrants)
-        drawTopLeftHUD(in: ctx, bounds: bounds)
-        drawTopRightHUD(in: ctx, bounds: bounds)
-        drawBottomLeftHUD(in: ctx, bounds: bounds)
-        drawBottomRightHUD(in: ctx, bounds: bounds)
+        // 2. Option 1: High-Contrast Floating Glass Badges
+        drawTopLeftClockBadge(in: ctx, bounds: bounds)
+        drawTopRightWeatherBadge(in: ctx, bounds: bounds)
+        drawBottomLeftTerminalBadge(in: ctx, bounds: bounds)
+        drawBottomRightMetricsBadge(in: ctx, bounds: bounds)
 
         // 3. Subtle CRT Scanlines
         drawCRTScanlines(in: ctx, bounds: bounds)
     }
 
-    // MARK: - Minimalist Borderless Floating HUD Widgets
+    // MARK: - Option 1 Badge Renderers
 
-    private func drawTopLeftHUD(in ctx: CGContext, bounds: CGRect) {
+    // TOP LEFT: 12-Hour Clock & Full Date Badge (No "NOSTROMO")
+    private func drawTopLeftClockBadge(in ctx: CGContext, bounds: CGRect) {
         ctx.saveGState()
         let now = Date()
+
         let fmtTime = DateFormatter()
-        fmtTime.dateFormat = "HH:mm:ss"
+        fmtTime.dateFormat = "hh:mm:ss a" // 12-Hour format with AM/PM
         let timeStr = fmtTime.string(from: now)
 
         let fmtDate = DateFormatter()
-        fmtDate.dateFormat = "yyyy-MM-dd"
+        fmtDate.dateFormat = "EEEE, MMMM d, yyyy"
         let dateStr = fmtDate.string(from: now)
 
-        let tagText = "⚡ NOSTROMO // \(timeStr) // \(dateStr)"
-        let textRect = CGRect(x: 24, y: bounds.height - 40, width: 340, height: 24)
+        let badgeRect = CGRect(x: 28, y: bounds.height - 84, width: 280, height: 60)
+        drawGlassPanel(in: ctx, rect: badgeRect, borderColor: colorBorderGreen)
 
-        // Subtle dark backdrop strip for high legibility
-        ctx.setFillColor(colorWidgetBg.cgColor)
-        ctx.fill(textRect.insetBy(dx: -6, dy: -2))
+        // 12-Hour Clock Text
+        (timeStr as NSString).draw(at: CGPoint(x: 42, y: bounds.height - 56), withAttributes: [
+            .font: fontClock,
+            .foregroundColor: colorNeonGreen
+        ])
 
-        (tagText as NSString).draw(at: CGPoint(x: 24, y: bounds.height - 36), withAttributes: [
+        // Date Text Below
+        (dateStr as NSString).draw(at: CGPoint(x: 42, y: bounds.height - 76), withAttributes: [
+            .font: fontDate,
+            .foregroundColor: colorTextDim
+        ])
+
+        ctx.restoreGState()
+    }
+
+    // TOP RIGHT: Phoenix Weather, Temperature & AQI Pill Badge
+    private func drawTopRightWeatherBadge(in ctx: CGContext, bounds: CGRect) {
+        ctx.saveGState()
+        let badgeW: CGFloat = 340
+        let badgeRect = CGRect(x: bounds.width - badgeW - 28, y: bounds.height - 84, width: badgeW, height: 60)
+        drawGlassPanel(in: ctx, rect: badgeRect, borderColor: colorBorderCyan)
+
+        if isOffline {
+            ("⚠️ PHOENIX METEO TELEMETRY" as NSString).draw(at: CGPoint(x: bounds.width - badgeW - 14, y: bounds.height - 54), withAttributes: [
+                .font: fontTagBold,
+                .foregroundColor: colorNeonPink
+            ])
+            ("SIGNAL LOST // RECONNECTING..." as NSString).draw(at: CGPoint(x: bounds.width - badgeW - 14, y: bounds.height - 74), withAttributes: [
+                .font: fontTagRegular,
+                .foregroundColor: colorNeonAmber
+            ])
+        } else {
+            let locStr = "PHOENIX, AZ // \(weatherCondStr)"
+            let statStr = "\(weatherTempStr)  |  \(weatherAqiStr)  |  \(weatherWindStr)"
+
+            (locStr as NSString).draw(at: CGPoint(x: bounds.width - badgeW - 14, y: bounds.height - 54), withAttributes: [
+                .font: fontTagBold,
+                .foregroundColor: colorNeonCyan
+            ])
+            (statStr as NSString).draw(at: CGPoint(x: bounds.width - badgeW - 14, y: bounds.height - 74), withAttributes: [
+                .font: fontTagRegular,
+                .foregroundColor: colorNeonAmber
+            ])
+        }
+        ctx.restoreGState()
+    }
+
+    // BOTTOM LEFT: 2-Line Mini Terminal Badge
+    private func drawBottomLeftTerminalBadge(in ctx: CGContext, bounds: CGRect) {
+        ctx.saveGState()
+        let badgeRect = CGRect(x: 28, y: 28, width: 480, height: 56)
+        drawGlassPanel(in: ctx, rect: badgeRect, borderColor: colorBorderCyan)
+
+        let line1 = "> \(currentLogLine)"
+        let line2 = "  \(secondaryLogLine)"
+
+        (line1 as NSString).draw(at: CGPoint(x: 40, y: 60), withAttributes: [
+            .font: fontTagRegular,
+            .foregroundColor: colorNeonGreen
+        ])
+        (line2 as NSString).draw(at: CGPoint(x: 40, y: 40), withAttributes: [
+            .font: fontSmall,
+            .foregroundColor: colorTextDim
+        ])
+        ctx.restoreGState()
+    }
+
+    // BOTTOM RIGHT: Micro System Gauges & ISS Orbit Badge
+    private func drawBottomRightMetricsBadge(in ctx: CGContext, bounds: CGRect) {
+        ctx.saveGState()
+        let badgeW: CGFloat = 430
+        let badgeRect = CGRect(x: bounds.width - badgeW - 28, y: 28, width: badgeW, height: 56)
+        drawGlassPanel(in: ctx, rect: badgeRect, borderColor: colorBorderCyan)
+
+        // Generate ASCII Progress Bars
+        let cpuBar = makeProgressBar(percent: cpuLoad)
+        let ramBar = makeProgressBar(percent: ramPressure)
+
+        let line1 = "CPU [\(cpuBar)] \(cpuLoad)%   RAM [\(ramBar)] \(ramPressure)%"
+        let line2 = "POWER RESERVE \(batReserve)%  |  ISS ORBIT 51.64°N 420.8KM"
+
+        (line1 as NSString).draw(at: CGPoint(x: bounds.width - badgeW - 14, y: 60), withAttributes: [
             .font: fontTagBold,
+            .foregroundColor: colorTextMain
+        ])
+        (line2 as NSString).draw(at: CGPoint(x: bounds.width - badgeW - 14, y: 40), withAttributes: [
+            .font: fontTagRegular,
             .foregroundColor: colorNeonCyan
         ])
         ctx.restoreGState()
     }
 
-    private func drawTopRightHUD(in ctx: CGContext, bounds: CGRect) {
-        ctx.saveGState()
-        let envText: String
-        let envColor: NSColor
+    // MARK: - Helper UI Builders
 
-        if isOffline {
-            envText = "⚠️ PHOENIX METEO: SIGNAL LOST // RECONNECTING..."
-            envColor = colorNeonPink
-        } else {
-            envText = "PHOENIX, AZ // \(weatherTempStr)  \(weatherAqiStr)  WIND \(weatherWindStr)"
-            envColor = colorNeonAmber
-        }
+    private func drawGlassPanel(in ctx: CGContext, rect: CGRect, borderColor: NSColor) {
+        let path = NSBezierPath(roundedRect: rect, xRadius: 6, yRadius: 6)
+        
+        // High-Contrast Frosted Glass Backdrop
+        colorBadgeBg.set()
+        path.fill()
 
-        let textWidth: CGFloat = 380
-        let textRect = CGRect(x: bounds.width - textWidth - 24, y: bounds.height - 40, width: textWidth, height: 24)
-
-        ctx.setFillColor(colorWidgetBg.cgColor)
-        ctx.fill(textRect.insetBy(dx: -6, dy: -2))
-
-        (envText as NSString).draw(at: CGPoint(x: bounds.width - textWidth - 20, y: bounds.height - 36), withAttributes: [
-            .font: fontTagRegular,
-            .foregroundColor: envColor
-        ])
-        ctx.restoreGState()
+        // 1px Neon Border
+        borderColor.set()
+        path.lineWidth = 1.0
+        path.stroke()
     }
 
-    private func drawBottomLeftHUD(in ctx: CGContext, bounds: CGRect) {
-        ctx.saveGState()
-        let termText = "> \(currentLogLine)"
-        let textRect = CGRect(x: 24, y: 24, width: 550, height: 24)
-
-        ctx.setFillColor(colorWidgetBg.cgColor)
-        ctx.fill(textRect.insetBy(dx: -6, dy: -2))
-
-        (termText as NSString).draw(at: CGPoint(x: 24, y: 28), withAttributes: [
-            .font: fontTagRegular,
-            .foregroundColor: colorNeonGreen
-        ])
-        ctx.restoreGState()
-    }
-
-    private func drawBottomRightHUD(in ctx: CGContext, bounds: CGRect) {
-        ctx.saveGState()
-        let sysText = "CPU \(cpuLoad)%  RAM \(ramPressure)%  PWR \(batReserve)%  |  ISS ORBIT 51.64°N"
-        let textWidth: CGFloat = 420
-        let textRect = CGRect(x: bounds.width - textWidth - 24, y: 24, width: textWidth, height: 24)
-
-        ctx.setFillColor(colorWidgetBg.cgColor)
-        ctx.fill(textRect.insetBy(dx: -6, dy: -2))
-
-        (sysText as NSString).draw(at: CGPoint(x: bounds.width - textWidth - 20, y: 28), withAttributes: [
-            .font: fontTagRegular,
-            .foregroundColor: colorTextMain
-        ])
-        ctx.restoreGState()
+    private func makeProgressBar(percent: Int) -> String {
+        let totalBlocks = 6
+        let filled = Int(round(Double(percent) / 100.0 * Double(totalBlocks)))
+        let empty = max(0, totalBlocks - filled)
+        return String(repeating: "█", count: filled) + String(repeating: "░", count: empty)
     }
 
     private func drawCRTScanlines(in ctx: CGContext, bounds: CGRect) {
@@ -225,7 +279,7 @@ public class CyberpunkSaverView: ScreenSaverView {
         ctx.restoreGState()
     }
 
-    // MARK: - Timers & Background Weather Updates
+    // MARK: - Timers & Background Updates
 
     private func startTimers() {
         stopTimers()
@@ -238,7 +292,7 @@ public class CyberpunkSaverView: ScreenSaverView {
             self?.fetchOpenMeteoWeather()
         }
 
-        terminalTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
+        terminalTimer = Timer.scheduledTimer(withTimeInterval: 3.5, repeats: true) { [weak self] _ in
             self?.appendTerminalLog()
         }
     }
@@ -259,8 +313,9 @@ public class CyberpunkSaverView: ScreenSaverView {
 
     private func appendTerminalLog() {
         let fmt = DateFormatter()
-        fmt.dateFormat = "HH:mm:ss"
+        fmt.dateFormat = "hh:mm:ss a"
         let timestamp = fmt.string(from: Date())
+        secondaryLogLine = currentLogLine
         let template = logTemplates[Int.random(in: 0..<logTemplates.count)]
         currentLogLine = "[\(timestamp)] \(template)"
     }
@@ -277,13 +332,16 @@ public class CyberpunkSaverView: ScreenSaverView {
                     return
                 }
 
-                if let temp = current["temperature_2m"] as? Double {
-                    self?.weatherTempStr = "\(Int(round(temp)))°C"
+                if let tempC = current["temperature_2m"] as? Double {
+                    let tempF = Int(round((tempC * 9.0 / 5.0) + 32.0))
+                    let roundedC = Int(round(tempC))
+                    self?.weatherTempStr = "\(roundedC)°C / \(tempF)°F"
                 }
                 if let wind = current["wind_speed_10m"] as? Double {
                     self?.weatherWindStr = "\(Int(wind)) KM/H"
                 }
-                self?.weatherAqiStr = "AQI 38"
+                self?.weatherCondStr = "CLEAR SOLAR"
+                self?.weatherAqiStr = "AQI 38 (GOOD)"
                 self?.isOffline = false
             }
         }
