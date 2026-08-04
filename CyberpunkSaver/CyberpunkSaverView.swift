@@ -2,27 +2,39 @@
 //  CyberpunkSaverView.swift
 //  CyberpunkSaver
 //
-//  Native macOS ScreenSaverView subclass with 100% REAL LIVE HOST SYSTEM TELEMETRY
-//  Reading actual M2 Pro CPU Core Load (Mach Kernel), RAM Memory Pressure (vm_statistics64),
-//  and Real Battery State (IOKit Power Sources API).
+//  Native macOS ScreenSaverView subclass with AVFoundation MP4 Looping Video Support.
+//  Renders hardware-accelerated looping video (background.mp4) or background.jpg fallback,
+//  with Option 1 Frosted Glass Telemetry Badges (12-Hour Clock, Phoenix Weather, Real CPU/RAM).
 //
 
 import ScreenSaver
 import AppKit
 import CoreGraphics
 import QuartzCore
-import Foundation
+import AVFoundation
 import IOKit.ps
 
-@objc(CyberpunkSaverView)
-public class CyberpunkSaverView: ScreenSaverView {
+// MARK: - HUD Overlay View (Renders Badges over Video)
 
-    // MARK: - Pre-Cached Colors
-    private let colorBgDark = NSColor(red: 0.02, green: 0.03, blue: 0.05, alpha: 1.0)
-    private let colorBadgeBg = NSColor(red: 0.02, green: 0.05, blue: 0.09, alpha: 0.85)
+private class HUDOverlayView: NSView {
+    
+    // Telemetry Data (Passed from Parent)
+    var timeStr: String = ""
+    var dateStr: String = ""
+    var weatherLocStr: String = "PHOENIX, AZ // CLEAR SOLAR"
+    var weatherStatStr: String = "38°C / 100°F  |  AQI 38 (GOOD)  |  12 KM/H"
+    var isOffline: Bool = false
+    var currentLogLine: String = "KUANG-DENG 0.9 // MATRIX LINK NOMINAL"
+    var secondaryLogLine: String = "SHIVA DECRYPTION NODES SYNCED"
+    var cpuLoad: Int = 0
+    var ramPressure: Int = 0
+    var batReserve: Int = 100
+    var isCharging: Bool = true
+
+    // Pre-Cached Colors
+    private let colorBadgeBg = NSColor(red: 0.02, green: 0.05, blue: 0.09, alpha: 0.88)
     private let colorBorderCyan = NSColor(red: 0.0, green: 0.9, blue: 1.0, alpha: 0.7)
     private let colorBorderGreen = NSColor(red: 0.0, green: 1.0, blue: 0.4, alpha: 0.7)
-    
     private let colorNeonGreen = NSColor(red: 0.0, green: 1.0, blue: 0.4, alpha: 1.0)
     private let colorNeonCyan = NSColor(red: 0.0, green: 0.9, blue: 1.0, alpha: 1.0)
     private let colorNeonAmber = NSColor(red: 1.0, green: 0.69, blue: 0.0, alpha: 1.0)
@@ -30,130 +42,29 @@ public class CyberpunkSaverView: ScreenSaverView {
     private let colorTextMain = NSColor(red: 0.88, green: 0.97, blue: 1.0, alpha: 1.0)
     private let colorTextDim = NSColor(red: 0.88, green: 0.97, blue: 1.0, alpha: 0.6)
 
-    // MARK: - Pre-Cached Fonts
+    // Pre-Cached Fonts
     private let fontClock = NSFont(name: "Menlo-Bold", size: 24) ?? NSFont.boldSystemFont(ofSize: 24)
     private let fontDate = NSFont(name: "Menlo-Bold", size: 12) ?? NSFont.boldSystemFont(ofSize: 12)
     private let fontTagBold = NSFont(name: "Menlo-Bold", size: 13) ?? NSFont.boldSystemFont(ofSize: 13)
     private let fontTagRegular = NSFont(name: "Menlo", size: 12) ?? NSFont.systemFont(ofSize: 12)
     private let fontSmall = NSFont(name: "Menlo", size: 11) ?? NSFont.systemFont(ofSize: 11)
 
-    // MARK: - 100% REAL Live Host Telemetry State
-    private var cpuLoad: Int = 0
-    private var ramPressure: Int = 0
-    private var batReserve: Int = 100
-    private var isCharging: Bool = true
-    private var previousCpuLoadInfo: (totalInUse: UInt64, totalTicks: UInt64)?
+    override var isOpaque: Bool { return false }
 
-    private var weatherTempStr: String = "38°C / 100°F"
-    private var weatherCondStr: String = "CLEAR SOLAR"
-    private var weatherAqiStr: String = "AQI 38 (GOOD)"
-    private var weatherWindStr: String = "12 KM/H"
-    private var isOffline: Bool = false
-
-    private var currentLogLine: String = "KUANG-DENG 0.9 // MATRIX LINK NOMINAL"
-    private var secondaryLogLine: String = "SHIVA DECRYPTION NODES SYNCED"
-    private let logTemplates = [
-        "KUANG-DENG 0.9 // INITIATING NEURAL MATRIX LINK...",
-        "BYPASSING CHIBA CITY BACKBONE FIREWALL [GATE 0x8F4A]",
-        "ICE DETECTED: BLACK ICE DEFENSE PROTOCOL ACTIVE",
-        "DEPLOYING SHIVA DISSOLUTION NODES (0x99F...0x41C)",
-        "DECRYPTING SATELLITE TELEMETRY PACKETS... 100% MATCH",
-        "CYBER-DEFENSE PULSE NEUTRALIZED. RETAINING ZERO-TRACE.",
-        "HOST MEMORY ALLOCATION: 0x00FF8800 [BUFFER STABLE]",
-        "OPEN-METEO TELEMETRY SYNCED // PHOENIX NODES RESPONDING",
-        "PROMOTION DISPLAY SYNCED // LATENCY 0.8ms"
-    ]
-
-    // MARK: - Assets & Timers
-    private var bgImage: NSImage?
-    private var telemetryTimer: Timer?
-    private var weatherTimer: Timer?
-    private var terminalTimer: Timer?
-
-    // MARK: - Initializers
-
-    public override init?(frame: NSRect, isPreview: Bool) {
-        super.init(frame: frame, isPreview: isPreview)
-        self.animationTimeInterval = 1.0 / 30.0
-        setupNativeComponents()
-    }
-
-    public required init?(coder: NSCoder) {
-        super.init(coder: coder)
-        self.animationTimeInterval = 1.0 / 30.0
-        setupNativeComponents()
-    }
-
-    // MARK: - Component Setup
-
-    private func setupNativeComponents() {
-        let bundle = Bundle(for: type(of: self))
-        if let imgURL = bundle.url(forResource: "background", withExtension: "jpg", subdirectory: "WebContent/assets") {
-            bgImage = NSImage(contentsOf: imgURL)
-        } else if let imgURL = bundle.url(forResource: "background", withExtension: "jpg") {
-            bgImage = NSImage(contentsOf: imgURL)
-        }
-
-        updateRealSystemMetrics()
-        fetchOpenMeteoWeather()
-    }
-
-    // MARK: - Animation Loop
-
-    public override func startAnimation() {
-        super.startAnimation()
-        startTimers()
-    }
-
-    public override func stopAnimation() {
-        super.stopAnimation()
-        stopTimers()
-    }
-
-    public override func animateOneFrame() {
-        super.animateOneFrame()
-        self.setNeedsDisplay(self.bounds)
-    }
-
-    // MARK: - Unified Single-Canvas Render Engine
-
-    public override func draw(_ rect: NSRect) {
-        super.draw(rect)
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
         guard let ctx = NSGraphicsContext.current?.cgContext else { return }
         let bounds = self.bounds
 
-        // 1. Draw Cyberpunk Balcony Cat Background Image
-        if let img = bgImage {
-            img.draw(in: bounds, from: .zero, operation: .copy, fraction: 1.0)
-        } else {
-            colorBgDark.set()
-            bounds.fill()
-        }
-
-        // 2. Option 1 High-Contrast Glass Telemetry Badges
         drawTopLeftClockBadge(in: ctx, bounds: bounds)
         drawTopRightWeatherBadge(in: ctx, bounds: bounds)
         drawBottomLeftTerminalBadge(in: ctx, bounds: bounds)
         drawBottomRightMetricsBadge(in: ctx, bounds: bounds)
-
-        // 3. Subtle CRT Scanlines
         drawCRTScanlines(in: ctx, bounds: bounds)
     }
 
-    // MARK: - Option 1 Badge Renderers
-
     private func drawTopLeftClockBadge(in ctx: CGContext, bounds: CGRect) {
         ctx.saveGState()
-        let now = Date()
-
-        let fmtTime = DateFormatter()
-        fmtTime.dateFormat = "hh:mm:ss a"
-        let timeStr = fmtTime.string(from: now)
-
-        let fmtDate = DateFormatter()
-        fmtDate.dateFormat = "EEEE, MMMM d, yyyy"
-        let dateStr = fmtDate.string(from: now)
-
         let badgeRect = CGRect(x: 32, y: bounds.height - 92, width: 300, height: 64)
         drawGlassPanel(in: ctx, rect: badgeRect, borderColor: colorBorderGreen)
 
@@ -184,14 +95,11 @@ public class CyberpunkSaverView: ScreenSaverView {
                 .foregroundColor: colorNeonAmber
             ])
         } else {
-            let locStr = "PHOENIX, AZ // \(weatherCondStr)"
-            let statStr = "\(weatherTempStr)  |  \(weatherAqiStr)  |  \(weatherWindStr)"
-
-            (locStr as NSString).draw(at: CGPoint(x: bounds.width - badgeW - 16, y: bounds.height - 60), withAttributes: [
+            (weatherLocStr as NSString).draw(at: CGPoint(x: bounds.width - badgeW - 16, y: bounds.height - 60), withAttributes: [
                 .font: fontTagBold,
                 .foregroundColor: colorNeonCyan
             ])
-            (statStr as NSString).draw(at: CGPoint(x: bounds.width - badgeW - 16, y: bounds.height - 82), withAttributes: [
+            (weatherStatStr as NSString).draw(at: CGPoint(x: bounds.width - badgeW - 16, y: bounds.height - 82), withAttributes: [
                 .font: fontTagRegular,
                 .foregroundColor: colorNeonAmber
             ])
@@ -242,14 +150,179 @@ public class CyberpunkSaverView: ScreenSaverView {
         ctx.restoreGState()
     }
 
+    private func drawGlassPanel(in ctx: CGContext, rect: CGRect, borderColor: NSColor) {
+        let path = NSBezierPath(roundedRect: rect, xRadius: 8, yRadius: 8)
+        colorBadgeBg.set()
+        path.fill()
+
+        borderColor.set()
+        path.lineWidth = 1.5
+        path.stroke()
+
+        ctx.setStrokeColor(colorNeonCyan.cgColor)
+        ctx.setLineWidth(2.0)
+        let tick: CGFloat = 6
+        ctx.move(to: CGPoint(x: rect.minX, y: rect.maxY - tick))
+        ctx.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+        ctx.addLine(to: CGPoint(x: rect.minX + tick, y: rect.maxY))
+        ctx.strokePath()
+    }
+
+    private func makeProgressBar(percent: Int) -> String {
+        let totalBlocks = 6
+        let filled = Int(round(Double(percent) / 100.0 * Double(totalBlocks)))
+        let empty = max(0, totalBlocks - filled)
+        return String(repeating: "█", count: filled) + String(repeating: "░", count: empty)
+    }
+
+    private func drawCRTScanlines(in ctx: CGContext, bounds: CGRect) {
+        ctx.saveGState()
+        ctx.setFillColor(NSColor(red: 0, green: 0, blue: 0, alpha: 0.08).cgColor)
+        var y: CGFloat = 0
+        while y < bounds.height {
+            ctx.fill(CGRect(x: 0, y: y, width: bounds.width, height: 2))
+            y += 4
+        }
+        ctx.restoreGState()
+    }
+}
+
+// MARK: - Primary CyberpunkSaverView Class
+
+@objc(CyberpunkSaverView)
+public class CyberpunkSaverView: ScreenSaverView {
+
+    private var hudView: HUDOverlayView?
+    private var player: AVQueuePlayer?
+    private var playerLooper: AVPlayerLooper?
+    private var playerLayer: AVPlayerLayer?
+    private var imageLayer: CALayer?
+
+    private var previousCpuLoadInfo: (totalInUse: UInt64, totalTicks: UInt64)?
+    private var telemetryTimer: Timer?
+    private var weatherTimer: Timer?
+    private var terminalTimer: Timer?
+
+    private let logTemplates = [
+        "KUANG-DENG 0.9 // INITIATING NEURAL MATRIX LINK...",
+        "BYPASSING CHIBA CITY BACKBONE FIREWALL [GATE 0x8F4A]",
+        "ICE DETECTED: BLACK ICE DEFENSE PROTOCOL ACTIVE",
+        "DEPLOYING SHIVA DISSOLUTION NODES (0x99F...0x41C)",
+        "DECRYPTING SATELLITE TELEMETRY PACKETS... 100% MATCH",
+        "CYBER-DEFENSE PULSE NEUTRALIZED. RETAINING ZERO-TRACE.",
+        "HOST MEMORY ALLOCATION: 0x00FF8800 [BUFFER STABLE]",
+        "OPEN-METEO TELEMETRY SYNCED // PHOENIX NODES RESPONDING",
+        "PROMOTION DISPLAY SYNCED // LATENCY 0.8ms"
+    ]
+
+    public override init?(frame: NSRect, isPreview: Bool) {
+        super.init(frame: frame, isPreview: isPreview)
+        self.animationTimeInterval = 1.0 / 30.0
+        setupMediaAndHUD()
+    }
+
+    public required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        self.animationTimeInterval = 1.0 / 30.0
+        setupMediaAndHUD()
+    }
+
+    public override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        playerLayer?.frame = self.bounds
+        imageLayer?.frame = self.bounds
+        hudView?.frame = self.bounds
+    }
+
+    private func setupMediaAndHUD() {
+        self.wantsLayer = true
+        guard let mainLayer = self.layer else { return }
+
+        let bundle = Bundle(for: type(of: self))
+        let videoURL = bundle.url(forResource: "background", withExtension: "mp4", subdirectory: "WebContent/assets")
+                     ?? bundle.url(forResource: "background", withExtension: "mp4")
+
+        if let url = videoURL {
+            let item = AVPlayerItem(url: url)
+            let qPlayer = AVQueuePlayer(playerItem: item)
+            playerLooper = AVPlayerLooper(player: qPlayer, templateItem: item)
+            
+            let pLayer = AVPlayerLayer(player: qPlayer)
+            pLayer.videoGravity = .resizeAspectFill
+            pLayer.frame = self.bounds
+            pLayer.autoresizingMask = [.layerWidthSizable, .layerHeightSizable]
+
+            mainLayer.addSublayer(pLayer)
+            self.playerLayer = pLayer
+            self.player = qPlayer
+            qPlayer.play()
+        } else {
+            // Static Image Fallback
+            var bgImg: NSImage?
+            if let imgURL = bundle.url(forResource: "background", withExtension: "jpg", subdirectory: "WebContent/assets") {
+                bgImg = NSImage(contentsOf: imgURL)
+            } else if let imgURL = bundle.url(forResource: "background", withExtension: "jpg") {
+                bgImg = NSImage(contentsOf: imgURL)
+            }
+
+            if let img = bgImg {
+                let imgL = CALayer()
+                imgL.frame = self.bounds
+                imgL.contents = img.layerContents(forContentsScale: self.window?.backingScaleFactor ?? 2.0)
+                imgL.contentsGravity = .resizeAspectFill
+                imgL.autoresizingMask = [.layerWidthSizable, .layerHeightSizable]
+                mainLayer.addSublayer(imgL)
+                self.imageLayer = imgL
+            }
+        }
+
+        // Add HUD Overlay View
+        let hud = HUDOverlayView(frame: self.bounds)
+        hud.autoresizingMask = [.width, .height]
+        self.addSubview(hud)
+        self.hudView = hud
+
+        updateRealSystemMetrics()
+        fetchOpenMeteoWeather()
+    }
+
+    public override func startAnimation() {
+        super.startAnimation()
+        player?.play()
+        startTimers()
+    }
+
+    public override func stopAnimation() {
+        super.stopAnimation()
+        player?.pause()
+        stopTimers()
+    }
+
+    public override func animateOneFrame() {
+        super.animateOneFrame()
+        updateClockStrings()
+        hudView?.needsDisplay = true
+    }
+
+    private func updateClockStrings() {
+        let now = Date()
+        let fmtTime = DateFormatter()
+        fmtTime.dateFormat = "hh:mm:ss a"
+        hudView?.timeStr = fmtTime.string(from: now)
+
+        let fmtDate = DateFormatter()
+        fmtDate.dateFormat = "EEEE, MMMM d, yyyy"
+        hudView?.dateStr = fmtDate.string(from: now)
+    }
+
     // MARK: - Real Host Kernel Telemetry Queries
 
     private func updateRealSystemMetrics() {
-        self.cpuLoad = fetchRealCPULoad()
-        self.ramPressure = fetchRealRAMPressure()
+        hudView?.cpuLoad = fetchRealCPULoad()
+        hudView?.ramPressure = fetchRealRAMPressure()
         let batInfo = fetchRealBatteryInfo()
-        self.batReserve = batInfo.percent
-        self.isCharging = batInfo.isCharging
+        hudView?.batReserve = batInfo.percent
+        hudView?.isCharging = batInfo.isCharging
     }
 
     private func fetchRealCPULoad() -> Int {
@@ -298,7 +371,6 @@ public class CyberpunkSaverView: ScreenSaverView {
         }
 
         previousCpuLoadInfo = (totalInUse: totalInUse, totalTicks: totalTicks)
-
         vm_deallocate(mach_task_self_, vm_address_t(bitPattern: cpuInfo), vm_size_t(Int(numProcessorInfo) * MemoryLayout<integer_t>.stride))
 
         return max(1, min(100, Int(round(usagePercent))))
@@ -348,46 +420,6 @@ public class CyberpunkSaverView: ScreenSaverView {
         return (100, true)
     }
 
-    // MARK: - UI Helpers
-
-    private func drawGlassPanel(in ctx: CGContext, rect: CGRect, borderColor: NSColor) {
-        let path = NSBezierPath(roundedRect: rect, xRadius: 8, yRadius: 8)
-        
-        colorBadgeBg.set()
-        path.fill()
-
-        borderColor.set()
-        path.lineWidth = 1.5
-        path.stroke()
-
-        // Sci-Fi Corner Tick Accents
-        ctx.setStrokeColor(colorNeonCyan.cgColor)
-        ctx.setLineWidth(2.0)
-        let tick: CGFloat = 6
-        ctx.move(to: CGPoint(x: rect.minX, y: rect.maxY - tick))
-        ctx.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
-        ctx.addLine(to: CGPoint(x: rect.minX + tick, y: rect.maxY))
-        ctx.strokePath()
-    }
-
-    private func makeProgressBar(percent: Int) -> String {
-        let totalBlocks = 6
-        let filled = Int(round(Double(percent) / 100.0 * Double(totalBlocks)))
-        let empty = max(0, totalBlocks - filled)
-        return String(repeating: "█", count: filled) + String(repeating: "░", count: empty)
-    }
-
-    private func drawCRTScanlines(in ctx: CGContext, bounds: CGRect) {
-        ctx.saveGState()
-        ctx.setFillColor(NSColor(red: 0, green: 0, blue: 0, alpha: 0.08).cgColor)
-        var y: CGFloat = 0
-        while y < bounds.height {
-            ctx.fill(CGRect(x: 0, y: y, width: bounds.width, height: 2))
-            y += 4
-        }
-        ctx.restoreGState()
-    }
-
     // MARK: - Timers & Background Updates
 
     private func startTimers() {
@@ -419,9 +451,9 @@ public class CyberpunkSaverView: ScreenSaverView {
         let fmt = DateFormatter()
         fmt.dateFormat = "hh:mm:ss a"
         let timestamp = fmt.string(from: Date())
-        secondaryLogLine = currentLogLine
+        hudView?.secondaryLogLine = hudView?.currentLogLine ?? ""
         let template = logTemplates[Int.random(in: 0..<logTemplates.count)]
-        currentLogLine = "[\(timestamp)] \(template)"
+        hudView?.currentLogLine = "[\(timestamp)] \(template)"
     }
 
     private func fetchOpenMeteoWeather() {
@@ -432,21 +464,20 @@ public class CyberpunkSaverView: ScreenSaverView {
                 guard let data = data, error == nil,
                       let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                       let current = json["current"] as? [String: Any] else {
-                    self?.isOffline = true
+                    self?.hudView?.isOffline = true
                     return
                 }
 
                 if let tempC = current["temperature_2m"] as? Double {
                     let tempF = Int(round((tempC * 9.0 / 5.0) + 32.0))
                     let roundedC = Int(round(tempC))
-                    self?.weatherTempStr = "\(roundedC)°C / \(tempF)°F"
+                    self?.hudView?.weatherStatStr = "\(roundedC)°C / \(tempF)°F  |  AQI 38 (GOOD)"
                 }
                 if let wind = current["wind_speed_10m"] as? Double {
-                    self?.weatherWindStr = "\(Int(wind)) KM/H"
+                    self?.hudView?.weatherStatStr += "  |  \(Int(wind)) KM/H"
                 }
-                self?.weatherCondStr = "CLEAR SOLAR"
-                self?.weatherAqiStr = "AQI 38 (GOOD)"
-                self?.isOffline = false
+                self?.hudView?.weatherLocStr = "PHOENIX, AZ // CLEAR SOLAR"
+                self?.hudView?.isOffline = false
             }
         }
         task.resume()
