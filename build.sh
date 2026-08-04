@@ -8,6 +8,10 @@ echo "============================================================"
 BUILD_DIR="build/CyberpunkSaver.saver"
 MODULE_CACHE="module-cache"
 
+# Generate self-contained single-file HTML bundle to bypass legacyScreenSaver sandbox file restrictions
+echo "📦 Generating in-memory WebContent HTML bundle..."
+python3 bundle_webcontent.py
+
 # Clean build dir
 rm -rf build "$MODULE_CACHE"
 mkdir -p "$BUILD_DIR/Contents/MacOS"

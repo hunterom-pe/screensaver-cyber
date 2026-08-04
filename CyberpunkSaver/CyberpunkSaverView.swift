@@ -28,7 +28,13 @@ public class CyberpunkSaverView: ScreenSaverView, WKNavigationDelegate, WKScript
         setupWebView()
     }
 
-    // MARK: - Frame Resizing & Layout
+    // MARK: - Drawing & Layout
+
+    public override func draw(_ rect: NSRect) {
+        super.draw(rect)
+        NSColor(red: 0.02, green: 0.02, blue: 0.04, alpha: 1.0).set()
+        rect.fill()
+    }
 
     public override func setFrameSize(_ newSize: NSSize) {
         super.setFrameSize(newSize)
@@ -74,28 +80,33 @@ public class CyberpunkSaverView: ScreenSaverView, WKNavigationDelegate, WKScript
     private func loadWebContent() {
         let bundle = Bundle(for: type(of: self))
         
-        // Primary location: WebContent/index.html inside bundle Resources
-        var htmlURL = bundle.url(forResource: "index", withExtension: "html", subdirectory: "WebContent")
-        if htmlURL == nil {
-            htmlURL = bundle.url(forResource: "index", withExtension: "html")
+        // Priority 1: Self-contained single-file bundle.html (zero file-system dependency)
+        var bundleURL = bundle.url(forResource: "bundle", withExtension: "html", subdirectory: "WebContent")
+        if bundleURL == nil {
+            bundleURL = bundle.url(forResource: "bundle", withExtension: "html")
         }
-        
-        let rootAccessURL = bundle.resourceURL ?? bundle.bundleURL
+        if bundleURL == nil {
+            bundleURL = bundle.url(forResource: "index", withExtension: "html", subdirectory: "WebContent")
+        }
+        if bundleURL == nil {
+            bundleURL = bundle.url(forResource: "index", withExtension: "html")
+        }
 
-        if let htmlURL = htmlURL {
-            // Load file URL with root access to all bundled WebContent assets
-            webView.loadFileURL(htmlURL, allowingReadAccessTo: rootAccessURL)
+        if let url = bundleURL, let htmlString = try? String(contentsOf: url, encoding: .utf8) {
+            webView.loadHTMLString(htmlString, baseURL: nil)
         } else {
-            // Fallback: Read index.html content directly if bundle pathing differs in legacyScreenSaver
+            // Fallback search by resource path
             let resourcePath = bundle.resourcePath ?? ""
+            let bundlePath = (resourcePath as NSString).appendingPathComponent("WebContent/bundle.html")
             let indexPath = (resourcePath as NSString).appendingPathComponent("WebContent/index.html")
             
-            if FileManager.default.fileExists(atPath: indexPath),
-               let htmlString = try? String(contentsOfFile: indexPath, encoding: .utf8) {
-                let baseURL = URL(fileURLWithPath: indexPath)
-                webView.loadHTMLString(htmlString, baseURL: baseURL)
+            let targetPath = FileManager.default.fileExists(atPath: bundlePath) ? bundlePath : indexPath
+            
+            if FileManager.default.fileExists(atPath: targetPath),
+               let htmlString = try? String(contentsOfFile: targetPath, encoding: .utf8) {
+                webView.loadHTMLString(htmlString, baseURL: nil)
             } else {
-                // Emergency inline render if bundle is standalone
+                // Emergency inline render
                 let fallbackHTML = """
                 <!DOCTYPE html>
                 <html>
@@ -118,12 +129,6 @@ public class CyberpunkSaverView: ScreenSaverView, WKNavigationDelegate, WKScript
 
     public func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         print("CyberpunkSaver WKWebView DidFailProvisional: \(error.localizedDescription)")
-        // Reload via HTML string if file URL permission failed
-        let bundle = Bundle(for: type(of: self))
-        if let htmlURL = bundle.url(forResource: "index", withExtension: "html", subdirectory: "WebContent"),
-           let htmlString = try? String(contentsOf: htmlURL, encoding: .utf8) {
-            webView.loadHTMLString(htmlString, baseURL: htmlURL)
-        }
     }
 
     // MARK: - Host System Metrics Telemetry & Timer
@@ -137,6 +142,10 @@ public class CyberpunkSaverView: ScreenSaverView, WKNavigationDelegate, WKScript
         super.stopAnimation()
         telemetryTimer?.invalidate()
         telemetryTimer = nil
+    }
+
+    public override func animateOneFrame() {
+        super.animateOneFrame()
     }
 
     private func startTelemetryTimer() {
