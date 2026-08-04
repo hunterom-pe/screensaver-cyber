@@ -2,8 +2,9 @@
 //  CyberpunkSaverView.swift
 //  CyberpunkSaver
 //
-//  Native macOS ScreenSaverView subclass featuring 100% Razor-Sharp 4K Image Rendering,
-//  Live Swaying Cat Tail Animation, Ambient Breathing Neon Flares, and Option 1 HUD Badges.
+//  Native macOS ScreenSaverView subclass featuring 100% Razor-Sharp 4K Static Background
+//  with Option 1 Frosted Glass Telemetry Badges (12-Hour Clock, Phoenix Open-Meteo Weather,
+//  Real Host Kernel CPU/RAM/Battery, and ICE Terminal).
 //
 
 import ScreenSaver
@@ -17,7 +18,7 @@ public class CyberpunkSaverView: ScreenSaverView {
 
     // MARK: - Pre-Cached Colors
     private let colorBgDark = NSColor(red: 0.02, green: 0.03, blue: 0.05, alpha: 1.0)
-    private let colorBadgeBg = NSColor(red: 0.02, green: 0.05, blue: 0.09, alpha: 0.88)
+    private let colorBadgeBg = NSColor(red: 0.02, green: 0.05, blue: 0.09, alpha: 0.85)
     private let colorBorderCyan = NSColor(red: 0.0, green: 0.9, blue: 1.0, alpha: 0.7)
     private let colorBorderGreen = NSColor(red: 0.0, green: 1.0, blue: 0.4, alpha: 0.7)
     
@@ -34,10 +35,6 @@ public class CyberpunkSaverView: ScreenSaverView {
     private let fontTagBold = NSFont(name: "Menlo-Bold", size: 13) ?? NSFont.boldSystemFont(ofSize: 13)
     private let fontTagRegular = NSFont(name: "Menlo", size: 12) ?? NSFont.systemFont(ofSize: 12)
     private let fontSmall = NSFont(name: "Menlo", size: 11) ?? NSFont.systemFont(ofSize: 11)
-
-    // MARK: - Animation State
-    private var tailAngle: CGFloat = 0.0
-    private var breathAngle: CGFloat = 0.0
 
     // MARK: - 100% REAL Live Host Telemetry State
     private var cpuLoad: Int = 0
@@ -76,13 +73,13 @@ public class CyberpunkSaverView: ScreenSaverView {
 
     public override init?(frame: NSRect, isPreview: Bool) {
         super.init(frame: frame, isPreview: isPreview)
-        self.animationTimeInterval = 1.0 / 60.0 // Smooth 60 FPS animation loop
+        self.animationTimeInterval = 1.0 / 30.0
         setupNativeComponents()
     }
 
     public required init?(coder: NSCoder) {
         super.init(coder: coder)
-        self.animationTimeInterval = 1.0 / 60.0
+        self.animationTimeInterval = 1.0 / 30.0
         setupNativeComponents()
     }
 
@@ -114,8 +111,6 @@ public class CyberpunkSaverView: ScreenSaverView {
 
     public override func animateOneFrame() {
         super.animateOneFrame()
-        tailAngle += 0.05
-        breathAngle += 0.03
         self.setNeedsDisplay(self.bounds)
     }
 
@@ -126,7 +121,7 @@ public class CyberpunkSaverView: ScreenSaverView {
         guard let ctx = NSGraphicsContext.current?.cgContext else { return }
         let bounds = self.bounds
 
-        // Enable high-quality image interpolation for 100% razor-sharp 4K output
+        // High-quality image interpolation for 100% sharp 4K image rendering
         ctx.interpolationQuality = .high
 
         // 1. Draw Razor-Sharp Background Image
@@ -137,67 +132,14 @@ public class CyberpunkSaverView: ScreenSaverView {
             bounds.fill()
         }
 
-        // 2. Draw Ambient Breathing Neon Glow over City Skyline
-        drawBreathingNeonGlow(in: ctx, bounds: bounds)
-
-        // 3. Draw Live Swaying Cat Tail Animation over Balcony Cat
-        drawAnimatedCatTail(in: ctx, bounds: bounds)
-
-        // 4. Draw Option 1 High-Contrast Glass Telemetry Badges
+        // 2. Option 1 High-Contrast Glass Telemetry Badges
         drawTopLeftClockBadge(in: ctx, bounds: bounds)
         drawTopRightWeatherBadge(in: ctx, bounds: bounds)
         drawBottomLeftTerminalBadge(in: ctx, bounds: bounds)
         drawBottomRightMetricsBadge(in: ctx, bounds: bounds)
 
-        // 5. Subtle CRT Scanlines
+        // 3. Subtle CRT Scanlines
         drawCRTScanlines(in: ctx, bounds: bounds)
-    }
-
-    // MARK: - Live Swaying Cat Tail Animation
-
-    private func drawAnimatedCatTail(in ctx: CGContext, bounds: CGRect) {
-        ctx.saveGState()
-        
-        // Exact Balcony Cat Railing Position
-        let catX = bounds.width * 0.645
-        let catY = bounds.height * 0.415
-        let sway = sin(tailAngle) * 16.0
-
-        ctx.setStrokeColor(NSColor(red: 0.02, green: 0.03, blue: 0.05, alpha: 1.0).cgColor)
-        ctx.setLineWidth(6.0)
-        ctx.setLineCap(.round)
-
-        let tailPath = CGMutablePath()
-        tailPath.move(to: CGPoint(x: catX + 18, y: catY + 8))
-        tailPath.addQuadCurve(
-            to: CGPoint(x: catX + 35 + sway, y: catY - 24),
-            control: CGPoint(x: catX + 28 + sway * 0.5, y: catY - 6)
-        )
-        ctx.addPath(tailPath)
-        ctx.strokePath()
-
-        // Subtle Cyan Neon Tip Glow on Tail
-        ctx.setStrokeColor(colorNeonCyan.withAlphaComponent(0.8).cgColor)
-        ctx.setLineWidth(2.0)
-        ctx.strokePath()
-
-        ctx.restoreGState()
-    }
-
-    // MARK: - Ambient Breathing Neon Glow
-
-    private func drawBreathingNeonGlow(in ctx: CGContext, bounds: CGRect) {
-        ctx.saveGState()
-        let pulseAlpha = (sin(breathAngle) * 0.15 + 0.25)
-
-        // Neon Glow over City Skyline Signs
-        ctx.setFillColor(colorNeonCyan.withAlphaComponent(pulseAlpha).cgColor)
-        ctx.fillEllipse(in: CGRect(x: bounds.width * 0.50, y: bounds.height * 0.65, width: 140, height: 40))
-
-        ctx.setFillColor(colorNeonPink.withAlphaComponent(pulseAlpha * 0.8).cgColor)
-        ctx.fillEllipse(in: CGRect(x: bounds.width * 0.18, y: bounds.height * 0.52, width: 100, height: 50))
-
-        ctx.restoreGState()
     }
 
     // MARK: - Option 1 Badge Renderers
