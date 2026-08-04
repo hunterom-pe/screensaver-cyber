@@ -2,8 +2,7 @@
 //  CyberpunkSaverView.swift
 //  CyberpunkSaver
 //
-//  Native macOS ScreenSaverView subclass featuring a 100% native Swift 120 FPS engine
-//  Rendering Nostromo Cyberpunk HUD Telemetry, Matrix Rain, Balcony Cat & Weather API.
+//  Native macOS ScreenSaverView subclass with disk-file debug logger
 //
 
 import ScreenSaver
@@ -11,6 +10,24 @@ import AppKit
 import CoreGraphics
 import QuartzCore
 import Foundation
+
+private func logToDisk(_ message: String) {
+    let logPath = "/tmp/cyberpunk_saver.log"
+    let fmt = DateFormatter()
+    fmt.dateFormat = "HH:mm:ss.SSS"
+    let timeStr = fmt.string(from: Date())
+    let line = "[\(timeStr)] \(message)\n"
+    
+    if let data = line.data(using: .utf8) {
+        if let fileHandle = FileHandle(forWritingAtPath: logPath) {
+            fileHandle.seekToEndOfFile()
+            fileHandle.write(data)
+            fileHandle.closeFile()
+        } else {
+            try? data.write(to: URL(fileURLWithPath: logPath), options: .atomic)
+        }
+    }
+}
 
 @objc(CyberpunkSaverView)
 public class CyberpunkSaverView: ScreenSaverView {
@@ -75,12 +92,14 @@ public class CyberpunkSaverView: ScreenSaverView {
     // MARK: - Initializers
 
     public override init?(frame: NSRect, isPreview: Bool) {
+        logToDisk("INIT called with frame: \(frame), isPreview: \(isPreview)")
         super.init(frame: frame, isPreview: isPreview)
-        self.animationTimeInterval = 1.0 / 120.0 // 120 FPS ProMotion
+        self.animationTimeInterval = 1.0 / 120.0
         setupNativeComponents()
     }
 
     public required init?(coder: NSCoder) {
+        logToDisk("INIT(coder) called")
         super.init(coder: coder)
         self.animationTimeInterval = 1.0 / 120.0
         setupNativeComponents()
@@ -89,13 +108,14 @@ public class CyberpunkSaverView: ScreenSaverView {
     // MARK: - Native Component Setup
 
     private func setupNativeComponents() {
+        logToDisk("setupNativeComponents starting...")
         self.wantsLayer = true
         self.layer?.backgroundColor = colorBgDark.cgColor
 
-        // Load background image
         let bundle = Bundle(for: type(of: self))
-        var bgImage: NSImage? = nil
+        logToDisk("Bundle path: \(bundle.bundlePath)")
         
+        var bgImage: NSImage? = nil
         if let imgURL = bundle.url(forResource: "background", withExtension: "jpg", subdirectory: "WebContent/assets") {
             bgImage = NSImage(contentsOf: imgURL)
         } else if let imgURL = bundle.url(forResource: "background", withExtension: "jpg") {
@@ -103,17 +123,21 @@ public class CyberpunkSaverView: ScreenSaverView {
         }
 
         if let image = bgImage {
+            logToDisk("Background image loaded successfully (\(image.size))")
             let iv = NSImageView(frame: self.bounds)
             iv.image = image
             iv.imageScaling = .scaleProportionallyUpOrDown
             iv.autoresizingMask = [.width, .height]
             self.addSubview(iv)
             self.bgImageView = iv
+        } else {
+            logToDisk("Warning: Background image could not be loaded from bundle.")
         }
 
         initMatrixRain()
         initTerminalLogs()
         fetchOpenMeteoWeather()
+        logToDisk("setupNativeComponents complete!")
     }
 
     private func initMatrixRain() {
@@ -143,11 +167,13 @@ public class CyberpunkSaverView: ScreenSaverView {
     // MARK: - Animation Loop & Render Engine
 
     public override func startAnimation() {
+        logToDisk("startAnimation() called")
         super.startAnimation()
         startTimers()
     }
 
     public override func stopAnimation() {
+        logToDisk("stopAnimation() called")
         super.stopAnimation()
         stopTimers()
     }
@@ -261,24 +287,20 @@ public class CyberpunkSaverView: ScreenSaverView {
         let catX = bounds.width * 0.78
         let catY = bounds.height * 0.18
 
-        // Balcony Railing Line
         ctx.setStrokeColor(colorNeonCyan.withAlphaComponent(0.6).cgColor)
         ctx.setLineWidth(2)
         ctx.move(to: CGPoint(x: catX - 80, y: catY))
         ctx.addLine(to: CGPoint(x: catX + 100, y: catY))
         ctx.strokePath()
 
-        // Cat Body Silhouette
         ctx.setFillColor(NSColor(red: 0.02, green: 0.03, blue: 0.05, alpha: 1.0).cgColor)
         ctx.addEllipse(in: CGRect(x: catX, y: catY, width: 36, height: 48))
         ctx.fillPath()
 
-        // Cat Head
         let headRect = CGRect(x: catX + 6, y: catY + 38, width: 24, height: 24)
         ctx.addEllipse(in: headRect)
         ctx.fillPath()
 
-        // Cat Ears with Twitch Animation
         let earTwitch = sin(catTailAngle * 0.7) * 3
         let leftEar = CGMutablePath()
         leftEar.move(to: CGPoint(x: catX + 8, y: catY + 56))
@@ -296,12 +318,10 @@ public class CyberpunkSaverView: ScreenSaverView {
         ctx.addPath(rightEar)
         ctx.fillPath()
 
-        // Cybernetic Glowing Eyes
         ctx.setFillColor(colorNeonCyan.cgColor)
         ctx.fillEllipse(in: CGRect(x: catX + 12, y: catY + 48, width: 3, height: 4))
         ctx.fillEllipse(in: CGRect(x: catX + 21, y: catY + 48, width: 3, height: 4))
 
-        // Animated Swaying Tail
         ctx.setStrokeColor(NSColor(red: 0.02, green: 0.03, blue: 0.05, alpha: 1.0).cgColor)
         ctx.setLineWidth(5)
         ctx.setLineCap(.round)
@@ -322,14 +342,12 @@ public class CyberpunkSaverView: ScreenSaverView {
         ctx.saveGState()
         let barRect = CGRect(x: 20, y: bounds.height - 60, width: bounds.width - 40, height: 42)
 
-        // Panel Background & Border
         ctx.setFillColor(colorPanelBg.cgColor)
         ctx.fill(barRect)
         ctx.setStrokeColor(colorBorderCyan.cgColor)
         ctx.setLineWidth(1)
         ctx.stroke(barRect)
 
-        // Brand Title
         let fontTitle = NSFont(name: "Menlo-Bold", size: 14) ?? NSFont.boldSystemFont(ofSize: 14)
         let titleAttrs: [NSAttributedString.Key: Any] = [
             .font: fontTitle,
@@ -337,7 +355,6 @@ public class CyberpunkSaverView: ScreenSaverView {
         ]
         ("⚡ NOSTROMO // ICE-BREAKER COMMAND v4.09.2-PROMOTION" as NSString).draw(at: CGPoint(x: 35, y: bounds.height - 48), withAttributes: titleAttrs)
 
-        // Live Clock
         let now = Date()
         let fmt = DateFormatter()
         fmt.dateFormat = "HH:mm:ss"
@@ -349,7 +366,6 @@ public class CyberpunkSaverView: ScreenSaverView {
         ]
         (timeStr as NSString).draw(at: CGPoint(x: bounds.width / 2 - 40, y: bounds.height - 50), withAttributes: clockAttrs)
 
-        // Status Badge
         let fontStatus = NSFont(name: "Menlo", size: 11) ?? NSFont.systemFont(ofSize: 11)
         let statusAttrs: [NSAttributedString.Key: Any] = [
             .font: fontStatus,
@@ -386,22 +402,18 @@ public class CyberpunkSaverView: ScreenSaverView {
         let gridH: CGFloat = bounds.height - 140
         let gridW: CGFloat = (bounds.width - 56) / 2
 
-        // Left Top: System Metrics Panel
         let rectP1 = CGRect(x: 20, y: gridY + gridH / 2 + 8, width: gridW, height: gridH / 2 - 8)
         drawWireframePanel(in: ctx, rect: rectP1, title: "SYSTEM METRICS // MAINFRAME [SYS-01]")
         drawSystemMetricsContent(in: ctx, rect: rectP1)
 
-        // Right Top: Phoenix Environment Panel
         let rectP2 = CGRect(x: bounds.width / 2 + 8, y: gridY + gridH / 2 + 8, width: gridW, height: gridH / 2 - 8)
         drawWireframePanel(in: ctx, rect: rectP2, title: "ENVIRONMENT // PHOENIX, AZ [ENV-02]")
         drawEnvironmentContent(in: ctx, rect: rectP2)
 
-        // Left Bottom: Satellite Radar Sweep Panel
         let rectP3 = CGRect(x: 20, y: gridY, width: gridW, height: gridH / 2 - 8)
         drawWireframePanel(in: ctx, rect: rectP3, title: "SATELLITE TRACKING // ISS ORBIT [SAT-03]")
         drawSatelliteContent(in: ctx, rect: rectP3)
 
-        // Right Bottom: Diagnostic ICE Terminal Panel
         let rectP4 = CGRect(x: bounds.width / 2 + 8, y: gridY, width: gridW, height: gridH / 2 - 8)
         drawWireframePanel(in: ctx, rect: rectP4, title: "DIAGNOSTIC TERMINAL // NEUROMANCER [TERM-04]")
         drawTerminalContent(in: ctx, rect: rectP4)
@@ -409,16 +421,13 @@ public class CyberpunkSaverView: ScreenSaverView {
 
     private func drawWireframePanel(in ctx: CGContext, rect: CGRect, title: String) {
         ctx.saveGState()
-        // Panel Background
         ctx.setFillColor(colorPanelBg.cgColor)
         ctx.fill(rect)
 
-        // Panel Border
         ctx.setStrokeColor(colorBorderCyan.cgColor)
         ctx.setLineWidth(1)
         ctx.stroke(rect)
 
-        // Nostromo Corner Ticks
         ctx.setStrokeColor(colorNeonCyan.cgColor)
         ctx.setLineWidth(2)
         let tickLen: CGFloat = 8
@@ -427,7 +436,6 @@ public class CyberpunkSaverView: ScreenSaverView {
         ctx.addLine(to: CGPoint(x: rect.minX + tickLen, y: rect.maxY))
         ctx.strokePath()
 
-        // Title Header Bar
         let headerRect = CGRect(x: rect.minX, y: rect.maxY - 24, width: rect.width, height: 24)
         ctx.setFillColor(colorNeonCyan.withAlphaComponent(0.12).cgColor)
         ctx.fill(headerRect)
@@ -442,30 +450,24 @@ public class CyberpunkSaverView: ScreenSaverView {
         ctx.restoreGState()
     }
 
-    // MARK: - Panel Content Renderers
-
     private func drawSystemMetricsContent(in ctx: CGContext, rect: CGRect) {
         ctx.saveGState()
         let fontVal = NSFont(name: "Menlo-Bold", size: 20) ?? NSFont.boldSystemFont(ofSize: 20)
         let fontLbl = NSFont(name: "Menlo", size: 10) ?? NSFont.systemFont(ofSize: 10)
 
-        // Gauge 1: CPU
         let g1X = rect.minX + 30
         let gY = rect.maxY - 85
         ("CPU LOAD" as NSString).draw(at: CGPoint(x: g1X, y: gY + 30), withAttributes: [.font: fontLbl, .foregroundColor: colorTextDim])
         ("\(cpuLoad)%" as NSString).draw(at: CGPoint(x: g1X, y: gY), withAttributes: [.font: fontVal, .foregroundColor: colorNeonCyan])
 
-        // Gauge 2: RAM
         let g2X = rect.minX + rect.width / 3 + 10
         ("RAM PRESSURE" as NSString).draw(at: CGPoint(x: g2X, y: gY + 30), withAttributes: [.font: fontLbl, .foregroundColor: colorTextDim])
         ("\(ramPressure)%" as NSString).draw(at: CGPoint(x: g2X, y: gY), withAttributes: [.font: fontVal, .foregroundColor: colorNeonAmber])
 
-        // Gauge 3: Battery
         let g3X = rect.minX + (rect.width / 3) * 2 + 10
         ("POWER RESERVE" as NSString).draw(at: CGPoint(x: g3X, y: gY + 30), withAttributes: [.font: fontLbl, .foregroundColor: colorTextDim])
         ("\(batReserve)%" as NSString).draw(at: CGPoint(x: g3X, y: gY), withAttributes: [.font: fontVal, .foregroundColor: colorNeonGreen])
 
-        // Sparkline Bus Activity
         let sparkRect = CGRect(x: rect.minX + 20, y: rect.minY + 20, width: rect.width - 40, height: 35)
         ctx.setFillColor(NSColor.black.withAlphaComponent(0.4).cgColor)
         ctx.fill(sparkRect)
@@ -506,13 +508,11 @@ public class CyberpunkSaverView: ScreenSaverView {
         let radarCenter = CGPoint(x: rect.minX + rect.width / 2, y: rect.minY + rect.height / 2 - 10)
         let radarRadius: CGFloat = min(rect.width, rect.height) / 2 - 30
 
-        // Concentric Circles
         ctx.setStrokeColor(colorNeonCyan.withAlphaComponent(0.3).cgColor)
         ctx.setLineWidth(1)
         ctx.strokeEllipse(in: CGRect(x: radarCenter.x - radarRadius, y: radarCenter.y - radarRadius, width: radarRadius * 2, height: radarRadius * 2))
         ctx.strokeEllipse(in: CGRect(x: radarCenter.x - radarRadius * 0.6, y: radarCenter.y - radarRadius * 0.6, width: radarRadius * 1.2, height: radarRadius * 1.2))
 
-        // Sweep Line
         ctx.setStrokeColor(colorNeonGreen.cgColor)
         ctx.setLineWidth(1.5)
         ctx.move(to: radarCenter)
@@ -521,7 +521,6 @@ public class CyberpunkSaverView: ScreenSaverView {
         ctx.addLine(to: CGPoint(x: sweepX, y: sweepY))
         ctx.strokePath()
 
-        // Target Reticle Tag
         let fontTag = NSFont(name: "Menlo", size: 10) ?? NSFont.systemFont(ofSize: 10)
         ("TARGET: ISS (NORAD #25544)  ORBIT: 51.64° N  ALT: 420.8 KM" as NSString).draw(at: CGPoint(x: rect.minX + 20, y: rect.minY + 15), withAttributes: [.font: fontTag, .foregroundColor: colorNeonGreen])
 
