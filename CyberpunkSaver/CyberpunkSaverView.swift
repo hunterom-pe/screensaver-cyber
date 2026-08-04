@@ -28,6 +28,18 @@ public class CyberpunkSaverView: ScreenSaverView, WKNavigationDelegate, WKScript
         setupWebView()
     }
 
+    // MARK: - Frame Resizing & Layout
+
+    public override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        webView?.frame = NSRect(origin: .zero, size: newSize)
+    }
+
+    public override func layout() {
+        super.layout()
+        webView?.frame = self.bounds
+    }
+
     // MARK: - Setup Hardware-Accelerated WKWebView
 
     private func setupWebView() {
@@ -35,7 +47,7 @@ public class CyberpunkSaverView: ScreenSaverView, WKNavigationDelegate, WKScript
 
         // Force hardware acceleration and full media playback without gesture requirements
         config.mediaTypesRequiringUserActionForPlayback = []
-        config.setValue(true, forKey: "developerExtrasEnabled")
+        config.preferences.setValue(true, forKey: "developerExtrasEnabled")
         
         // Register Swift Script Message Handler
         let contentController = WKUserContentController()
@@ -46,12 +58,13 @@ public class CyberpunkSaverView: ScreenSaverView, WKNavigationDelegate, WKScript
         webView.autoresizingMask = [.width, .height]
         webView.navigationDelegate = self
         
-        // Make background transparent so ScreenSaver canvas layer shows cleanly
-        webView.setValue(false, forKey: "drawsBackground")
+        // Ensure webView renders a dark opaque background to prevent black void
+        webView.setValue(true, forKey: "drawsBackground")
+        webView.wantsLayer = true
+        webView.layer?.backgroundColor = NSColor(red: 0.02, green: 0.02, blue: 0.04, alpha: 1.0).cgColor
         
-        // Mute audio output completely
-        if #available(macOS 13.0, *) {
-            webView.setAllMediaPlaybackSuspended(false)
+        if #available(macOS 12.0, *) {
+            webView.underPageBackgroundColor = NSColor(red: 0.02, green: 0.02, blue: 0.04, alpha: 1.0)
         }
 
         self.addSubview(webView)
@@ -61,17 +74,55 @@ public class CyberpunkSaverView: ScreenSaverView, WKNavigationDelegate, WKScript
     private func loadWebContent() {
         let bundle = Bundle(for: type(of: self))
         
-        // Locate index.html inside bundled WebContent directory
-        if let htmlURL = bundle.url(forResource: "index", withExtension: "html", subdirectory: "WebContent") {
-            let readAccessURL = htmlURL.deletingLastPathComponent()
-            webView.loadFileURL(htmlURL, allowingReadAccessTo: readAccessURL)
-        } else if let htmlURL = bundle.url(forResource: "index", withExtension: "html") {
-            let readAccessURL = htmlURL.deletingLastPathComponent()
-            webView.loadFileURL(htmlURL, allowingReadAccessTo: readAccessURL)
+        // Primary location: WebContent/index.html inside bundle Resources
+        var htmlURL = bundle.url(forResource: "index", withExtension: "html", subdirectory: "WebContent")
+        if htmlURL == nil {
+            htmlURL = bundle.url(forResource: "index", withExtension: "html")
+        }
+        
+        let rootAccessURL = bundle.resourceURL ?? bundle.bundleURL
+
+        if let htmlURL = htmlURL {
+            // Load file URL with root access to all bundled WebContent assets
+            webView.loadFileURL(htmlURL, allowingReadAccessTo: rootAccessURL)
         } else {
-            // Fallback string if bundle resources are being prepared
-            let fallbackHTML = "<html><body style='background:#040609;color:#00ff66;font-family:monospace;padding:40px;'><h1>NOSTROMO HUD // INDEX.HTML LOADING...</h1></body></html>"
-            webView.loadHTMLString(fallbackHTML, baseURL: nil)
+            // Fallback: Read index.html content directly if bundle pathing differs in legacyScreenSaver
+            let resourcePath = bundle.resourcePath ?? ""
+            let indexPath = (resourcePath as NSString).appendingPathComponent("WebContent/index.html")
+            
+            if FileManager.default.fileExists(atPath: indexPath),
+               let htmlString = try? String(contentsOfFile: indexPath, encoding: .utf8) {
+                let baseURL = URL(fileURLWithPath: indexPath)
+                webView.loadHTMLString(htmlString, baseURL: baseURL)
+            } else {
+                // Emergency inline render if bundle is standalone
+                let fallbackHTML = """
+                <!DOCTYPE html>
+                <html>
+                <body style="background:#040609;color:#00ff66;font-family:monospace;padding:40px;text-align:center;">
+                    <h1 style="color:#00e5ff;">NOSTROMO // ICE-BREAKER COMMAND</h1>
+                    <p style="color:#ffb000;">INITIALIZING WEBVIEW HUD ENGINE...</p>
+                </body>
+                </html>
+                """
+                webView.loadHTMLString(fallbackHTML, baseURL: nil)
+            }
+        }
+    }
+
+    // MARK: - Navigation Delegate & Error Logging
+
+    public func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        print("CyberpunkSaver WKWebView DidFail: \(error.localizedDescription)")
+    }
+
+    public func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        print("CyberpunkSaver WKWebView DidFailProvisional: \(error.localizedDescription)")
+        // Reload via HTML string if file URL permission failed
+        let bundle = Bundle(for: type(of: self))
+        if let htmlURL = bundle.url(forResource: "index", withExtension: "html", subdirectory: "WebContent"),
+           let htmlString = try? String(contentsOf: htmlURL, encoding: .utf8) {
+            webView.loadHTMLString(htmlString, baseURL: htmlURL)
         }
     }
 
@@ -119,7 +170,6 @@ public class CyberpunkSaverView: ScreenSaverView, WKNavigationDelegate, WKScript
 
         let result = host_processor_info(mach_host_self(), PROCESSOR_CPU_LOAD_INFO, &numCpus, &cpuInfo, &numCpuInfo)
         if result == KERN_SUCCESS {
-            // Nominal calculated core load
             let baseLoad = Int.random(in: 20...45)
             vm_deallocate(mach_task_self_, vm_address_t(bitPattern: cpuInfo), vm_size_t(numCpuInfo))
             return baseLoad

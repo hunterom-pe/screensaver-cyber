@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" style="background-color: #040609 !important; color: #00ff66;">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,7 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
-<body>
+<body style="background-color: #040609 !important; color: #00ff66; margin: 0; padding: 0; overflow: hidden;">
   <!-- CRT Screen Overlay Effects -->
   <div class="crt-overlay"></div>
   <div class="scanlines"></div>
@@ -18,7 +18,7 @@
   <!-- LAYER 1: Cyberpunk Balcony City Background & Cat -->
   <div id="layer-background" class="layer-bg">
     <div class="bg-image-wrapper">
-      <img src="assets/background.jpg" alt="Cyberpunk City Panorama" id="bg-img">
+      <img src="assets/background.jpg" alt="Cyberpunk City Panorama" id="bg-img" onerror="this.style.display='none';">
       <div class="bg-glow"></div>
       <div class="sky-light-trails" id="light-trails"></div>
     </div>
@@ -209,7 +209,7 @@
         </div>
         <div class="panel-body sat-body">
           <div class="sat-viewport">
-            <!-- Simulated Tactical Radar Canvas overlay -->
+            <!-- Tactical Radar Canvas overlay -->
             <canvas id="radar-canvas" class="radar-canvas"></canvas>
 
             <div class="targeting-reticle">
